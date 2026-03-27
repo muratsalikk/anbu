@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Help - Config | ANBU UI{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h1 class="h3 mb-1">Config Tab Help</h1>
+    <div class="text-muted small">Target-level identity, scheduling, and mute controls.</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{% url 'targets:help' %}">Help Index</a>
+    <a class="btn btn-outline-primary" href="{% url 'targets:help_topic' 'engine' %}">Engine Doc</a>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <h2 class="h5">What This Tab Controls</h2>
+    <ul class="mb-0">
+      <li><code>TARGET_NAME</code>: immutable identity key used in filenames and runtime result rows.</li>
+      <li><code>DESCRIPTION</code>, <code>TAG_LIST</code>, <code>DOCUMENT_URL</code>, <code>DASHBOARD_URL</code>: operator context and links.</li>
+      <li><code>IS_ACTIVE</code>: when false, scheduler still ticks but runtime inserts <code>state=skipped</code>.</li>
+      <li><code>IS_MUTED</code>: action execution is suppressed and saved as <code>TARGET_MUTED-NO_ACTION_TAKEN</code>.</li>
+      <li><code>SCHEDULE_CRON</code>: minute-based schedule gate checked by engine scheduler.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <h2 class="h5">Scheduler Behavior</h2>
+    <p class="mb-2">
+      The scheduler loop evaluates every minute. For each target, it checks <code>SCHEDULE_CRON</code> and computes mute state for the next minute.
+      This comes from both static mute flags and dynamic mute rules.
+    </p>
+    <ul class="mb-0">
+      <li><code>MUTE_BETWEEN_ENABLED</code> + <code>MUTE_BETWEEN_RULES</code>: supports multiple day/time windows.</li>
+      <li><code>MUTE_UNTIL_ENABLED</code> + <code>MUTE_UNTIL</code>: fixed datetime boundary; if now is before boundary, target is muted.</li>
+      <li>Cross-midnight windows are supported: <code>23:00-06:00</code> means late night into next day.</li>
+      <li>When a target is muted, evaluation still writes rows; only actions are skipped.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <h2 class="h5">Mute Rules Structure</h2>
+    <p class="mb-2">
+      <code>MUTE_BETWEEN_RULES</code> is a JSON array.
+    </p>
+    <pre class="bg-light border rounded p-2 mb-2"><code>[
+  {"start":"23:00","end":"06:00","days":["MON","TUE","WED","THU","FRI"]},
+  {"start":"00:00","end":"23:59","days":["SAT","SUN"]}
+]</code></pre>
+    <ul class="mb-0">
+      <li><code>start</code>/<code>end</code> format is <code>HH:MM</code>.</li>
+      <li><code>days</code> values are <code>MON..SUN</code>.</li>
+      <li>If days are missing in a rule, runtime defaults to all days.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <h2 class="h5">Related Docs</h2>
+    <ul class="mb-0">
+      <li><a href="{% url 'targets:help_topic' 'ai-migration' %}">AI-Assisted Alarm Migration</a></li>
+      <li><a href="{% url 'targets:help_topic' 'sql' %}">SQL Tab Help</a></li>
+      <li><a href="{% url 'targets:help_topic' 'metrics' %}">Metrics Tab Help</a></li>
+      <li><a href="{% url 'targets:help_topic' 'engine' %}">Engine Documentation</a></li>
+    </ul>
+  </div>
+</div>
+{% endblock %}

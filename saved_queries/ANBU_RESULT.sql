@@ -1,0 +1,1 @@
+select * from anbu_result

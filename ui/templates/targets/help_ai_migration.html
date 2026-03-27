@@ -1,0 +1,117 @@
+{% extends "base.html" %}
+{% block title %}Help - AI Migration | ANBU UI{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h1 class="h3 mb-1">AI-Assisted Alarm Migration</h1>
+    <div class="text-muted small">Fast process to migrate existing alarms into ANBU target files.</div>
+  </div>
+  <a class="btn btn-outline-secondary" href="{% url 'targets:help' %}">Back to Help</a>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <h2 class="h5 mb-3">Fast Workflow (Recommended)</h2>
+    <ol class="mb-0">
+      <li>Open <strong>Targets</strong> and click <strong>New Target With AI</strong>.</li>
+      <li>Copy the prompt and paste it into your LLM.</li>
+      <li>Provide source alarm definition (legacy query, thresholds, actions, severity policy).</li>
+      <li>Ask for output in three files: <code>.env</code>, <code>.sql</code>, optional <code>.hql</code>.</li>
+      <li>Paste generated files back into ANBU modal, then open target edit page and review.</li>
+      <li>Test with Explore/Test Actions before enabling in production.</li>
+    </ol>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <h2 class="h5 mb-3">Migration Input Template</h2>
+    <p class="mb-2">Use this template when prompting the LLM to reduce back-and-forth:</p>
+    <pre class="bg-light border rounded p-2 mb-0"><code>MIGRATION_CONTEXT:
+TARGET_NAME:
+DESCRIPTION:
+DATA_SOURCE:
+SQL_MODE: single|multiline
+SCHEDULE_CRON:
+SOURCE_SYSTEM: (Nagios/Prometheus/Zabbix/custom)
+
+SOURCE_QUERY_OR_LOGIC:
+
+METRICS:
+- NAME:
+  VALUE_FIELD_OR_EXPR:
+  TYPE: alarming|monitor_only|diagnostic
+  THRESHOLDS:
+    CRITICAL:
+    MAJOR:
+    MINOR:
+  ACTIONS:
+    NORMAL:
+    CRITICAL:
+    MAJOR:
+    MINOR:
+  MESSAGE_TEMPLATE:
+
+MUTE_POLICY:
+- BETWEEN:
+- UNTIL:
+
+CONSTRAINTS:
+- Prefer detection over misses.
+- Limit false positives with practical thresholds.
+- Keep read-only SQL only.</code></pre>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <h2 class="h5 mb-3">What to Keep from Existing Alarms</h2>
+    <ul class="mb-0">
+      <li>Preserve target intent and business impact semantics, not only threshold numbers.</li>
+      <li>Preserve severity mapping (CRITICAL/MAJOR/MINOR) unless there is a deliberate policy change.</li>
+      <li>Preserve alert messages that operators already understand, then improve placeholders and context.</li>
+      <li>Preserve known maintenance/mute behavior, but revalidate long mute windows.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <h2 class="h5 mb-3">Monitor-Only Metrics in ANBU</h2>
+    <p class="mb-2">
+      ANBU metrics are not always paging metrics. You can include metrics for trend visibility (for example Grafana) without operational noise.
+    </p>
+    <ul class="mb-0">
+      <li>Use non-paging action routing for normal and severity transitions where possible.</li>
+      <li>Avoid deleting useful metrics just because they are noisy. Convert them to monitor-only while tuning.</li>
+      <li>Keep metric naming stable across migration to preserve dashboard continuity.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <h2 class="h5 mb-3">Quality Gate Before Enable</h2>
+    <ol class="mb-0">
+      <li>Validate SQL shape against chosen mode (single row vs multiline metric rows).</li>
+      <li>Check mapping aliases and metric VALUE references.</li>
+      <li>Run query in Explore and inspect result distribution.</li>
+      <li>Confirm action scripts exist and are correct in Test Actions.</li>
+      <li>Review mute windows and default schedule.</li>
+      <li>Enable target with close observation for first cycles, then tune.</li>
+    </ol>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <h2 class="h5 mb-3">Related Documentation</h2>
+    <ul class="mb-0">
+      <li><a href="{% url 'targets:help_topic' 'alarm-planning' %}">Alarm Planning</a></li>
+      <li><a href="{% url 'targets:help_topic' 'sql' %}">SQL Tab Help</a></li>
+      <li><a href="{% url 'targets:help_topic' 'metrics' %}">Metrics Tab Help</a></li>
+      <li><a href="{% url 'targets:help_topic' 'engine' %}">Engine Documentation</a></li>
+    </ul>
+  </div>
+</div>
+{% endblock %}

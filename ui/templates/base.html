@@ -1,0 +1,103 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}ANBU UI{% endblock %}</title>
+  <link rel="icon" href="{% url 'targets:app_logo' %}">
+  <link rel="stylesheet" href="{% static 'vendor/bootstrap/bootstrap.min.css' %}">
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+</head>
+<body>
+  <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">
+    <div class="container-fluid">
+      <a class="navbar-brand d-flex align-items-center gap-2" href="{% url 'targets:list' %}">
+        <img
+          src="{% url 'targets:app_logo' %}"
+          alt="ANBU logo"
+          width="24"
+          height="24"
+          class="rounded"
+          onerror="this.style.display='none'">
+        <span>ANBU Alarm Management</span>
+      </a>
+      {% if request.user.is_authenticated %}
+        <div class="navbar-nav me-auto">
+          <a class="nav-link" href="{% url 'targets:list' %}">Targets</a>
+          <a class="nav-link" href="{% url 'targets:explore' %}">Explore</a>
+          <a class="nav-link" href="{% url 'targets:test_actions' %}">Test Actions</a>
+          <a class="nav-link" href="{% url 'targets:logs' %}">Logs</a>
+          <div class="nav-item dropdown">
+            <a
+              class="nav-link dropdown-toggle"
+              href="#"
+              role="button"
+              data-bs-toggle="dropdown"
+              aria-expanded="false">Admin</a>
+            <ul class="dropdown-menu">
+              <li><a class="dropdown-item" href="{% url 'targets:settings' %}">Settings</a></li>
+              <li><a class="dropdown-item" href="/admin/auth/user/">Users</a></li>
+              <li><a class="dropdown-item" href="/admin/">Console</a></li>
+            </ul>
+          </div>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <span class="text-light small">{{ request.user.username }}</span>
+          <a class="btn btn-outline-light btn-sm" href="{% url 'logout' %}">Logout</a>
+          <a
+            class="btn btn-outline-light btn-sm anbu-help-icon"
+            href="{% url 'targets:help' %}"
+            title="Help"
+            aria-label="Help">?</a>
+        </div>
+      {% endif %}
+    </div>
+  </nav>
+
+  <main class="container-fluid px-4 pb-4">
+    {% block content %}{% endblock %}
+  </main>
+
+  {% if messages %}
+    <div class="toast-container position-fixed bottom-0 end-0 p-3" style="z-index: 1100;">
+      {% for message in messages %}
+        <div
+          class="toast anbu-toast border-0 {% if 'error' in message.tags %}text-bg-danger{% elif 'warning' in message.tags %}text-bg-warning{% elif 'success' in message.tags %}text-bg-success{% else %}text-bg-primary{% endif %}"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          data-bs-autohide="true"
+          data-bs-delay="4500">
+          <div class="d-flex">
+            <div class="toast-body">{{ message }}</div>
+            <button
+              type="button"
+              class="btn-close {% if 'warning' not in message.tags %}btn-close-white{% endif %} me-2 m-auto"
+              data-bs-dismiss="toast"
+              aria-label="Close"></button>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <script src="{% static 'vendor/htmx/htmx.min.js' %}"></script>
+  <script src="{% static 'vendor/bootstrap/bootstrap.bundle.min.js' %}"></script>
+  <script>window.ANBU_ACE_BASE="{% static 'vendor/ace' %}";</script>
+  <script src="{% static 'vendor/ace/ace.js' %}"></script>
+  <script src="{% static 'vendor/ace/mode-sql.js' %}"></script>
+  <script src="{% static 'vendor/ace/theme-github.js' %}"></script>
+  <script src="{% static 'js/ace-editor.js' %}"></script>
+  <script>
+    (function() {
+      const toasts = document.querySelectorAll(".anbu-toast");
+      toasts.forEach((node) => {
+        const instance = bootstrap.Toast.getOrCreateInstance(node);
+        instance.show();
+      });
+    })();
+  </script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

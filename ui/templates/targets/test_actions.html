@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Test Actions | ANBU UI{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h1 class="h3 mb-1">Test Actions</h1>
+    <div class="text-muted small">Run action scripts with manual test arguments.</div>
+  </div>
+  <a class="btn btn-outline-secondary" href="{% url 'targets:list' %}">Back to Targets</a>
+</div>
+
+<form method="post" class="card mb-3">
+  <div class="card-body">
+    {% csrf_token %}
+
+    <div class="row g-3 mb-2">
+      <div class="col-12 col-md-5 col-lg-4">
+        <label class="form-label" for="id_action_name">Action</label>
+        <select class="form-select" id="id_action_name" name="action_name" {% if not action_names %}disabled{% endif %}>
+          {% if action_names %}
+            {% for action_name in action_names %}
+              <option value="{{ action_name }}" {% if selected_action == action_name %}selected{% endif %}>{{ action_name }}</option>
+            {% endfor %}
+          {% else %}
+            <option value="">No actions configured</option>
+          {% endif %}
+        </select>
+      </div>
+      <div class="col-12 col-md-7 col-lg-8">
+        <label class="form-label">Script</label>
+        <input type="text" class="form-control" value="{{ script_path|default:'not found' }}" readonly>
+      </div>
+    </div>
+
+    <div class="row g-3 mb-3">
+      <div class="col-12 col-md-6 col-lg-3">
+        <label class="form-label" for="id_target_name">Target Name</label>
+        <input type="text" class="form-control" id="id_target_name" name="target_name" value="{{ target_name_value }}">
+      </div>
+      <div class="col-12 col-md-6 col-lg-3">
+        <label class="form-label" for="id_metric_name">Metric Name</label>
+        <input type="text" class="form-control" id="id_metric_name" name="metric_name" value="{{ metric_name_value }}">
+      </div>
+      <div class="col-12 col-md-6 col-lg-2">
+        <label class="form-label" for="id_metric_value">Metric Value</label>
+        <input type="text" class="form-control" id="id_metric_value" name="metric_value" value="{{ metric_value_value }}">
+      </div>
+      <div class="col-12 col-md-6 col-lg-2">
+        <label class="form-label" for="id_severity">Severity</label>
+        <input type="text" class="form-control" id="id_severity" name="severity" value="{{ severity_value }}">
+      </div>
+      <div class="col-12 col-lg-2">
+        <label class="form-label" for="id_timeout_sec">Timeout (sec)</label>
+        <input type="number" class="form-control" id="id_timeout_sec" name="timeout_sec" min="5" max="900" step="5" value="{{ timeout_sec_value }}">
+      </div>
+      <div class="col-12">
+        <label class="form-label" for="id_message">Message</label>
+        <input type="text" class="form-control" id="id_message" name="message" value="{{ message_value }}">
+      </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary">Test Action</button>
+  </div>
+</form>
+
+{% if run_error %}
+  <div class="alert alert-danger">{{ run_error }}</div>
+{% endif %}
+
+{% if exit_status is not None %}
+  <div class="card">
+    <div class="card-body">
+      <div class="mb-2"><strong>Script path:</strong> {{ resolved_script_path }}</div>
+      <div class="mb-3"><strong>Exit status:</strong> {{ exit_status }}</div>
+
+      <div class="row g-3">
+        <div class="col-12 col-lg-6">
+          <label class="form-label">stdout</label>
+          <textarea class="form-control font-monospace" rows="10" readonly>{{ stdout_text }}</textarea>
+        </div>
+        <div class="col-12 col-lg-6">
+          <label class="form-label">stderr</label>
+          <textarea class="form-control font-monospace" rows="10" readonly>{{ stderr_text }}</textarea>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endif %}
+{% endblock %}

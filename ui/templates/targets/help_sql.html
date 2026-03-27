@@ -1,0 +1,114 @@
+{% extends "base.html" %}
+{% block title %}Help - SQL | ANBU UI{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h1 class="h3 mb-1">SQL Tab Help</h1>
+    <div class="text-muted small">Query shape, execution mode, and value mapping model.</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{% url 'targets:help' %}">Help Index</a>
+    <a class="btn btn-outline-primary" href="{% url 'targets:help_topic' 'engine' %}">Engine Doc</a>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <h2 class="h5">Read-Only Requirement</h2>
+    <p class="mb-2">
+      Target SQL must be read-only. Runtime accepts only <code>SELECT</code> or <code>WITH ... SELECT</code> patterns and rejects write/DDL statements.
+    </p>
+    <ul class="mb-0">
+      <li>Rejected examples: <code>INSERT</code>, <code>UPDATE</code>, <code>DELETE</code>, <code>ALTER</code>, <code>DROP</code>, <code>CREATE</code>.</li>
+      <li>Multiple statements separated by semicolons are rejected.</li>
+      <li>This validation is enforced in both UI validation and engine runtime checks.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <h2 class="h5">Single Mode vs Multiline Mode</h2>
+    <div class="table-responsive">
+      <table class="table table-sm table-bordered align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Mode</th>
+            <th>Expected SQL Result</th>
+            <th>Typical Use</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>single</code></td>
+            <td>Exactly one row, up to 10 columns.</td>
+            <td>Small fixed metric set evaluated from one snapshot row.</td>
+          </tr>
+          <tr>
+            <td><code>multiline</code></td>
+            <td>Multiple rows. Column 1 must be metric name. Columns 2..10 are values.</td>
+            <td>Per-metric row evaluation at scale (dynamic metric set, row-driven).</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="mt-3 mb-0">
+      If your dataset naturally returns one row per metric (for example grouped KPI output), choose <code>multiline</code>.
+      If your query returns one compact aggregate row consumed by all metrics, choose <code>single</code>.
+    </p>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <h2 class="h5">Mappings: Why They Exist</h2>
+    <p class="mb-2">
+      Mappings convert positional SQL columns (<code>VAL1..VAL10</code>) into readable aliases (for example <code>OPEN_COUNT</code>, <code>LAG_MIN</code>).
+      These aliases are then used in metric value binding, condition formulas, and message placeholders.
+    </p>
+    <ul class="mb-0">
+      <li>Without mappings, conditions use raw <code>VAL*</code> references.</li>
+      <li>With mappings, formulas are more maintainable and easier to review.</li>
+      <li>Aliases become part of evaluation context at runtime.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <h2 class="h5">Multiline Mapping Rule</h2>
+    <ul class="mb-2">
+      <li><code>MAP_VAL1</code> is reserved and must be <code>METRIC_NAME</code>.</li>
+      <li>Do not assign <code>METRIC_NAME</code> to any other mapping slot.</li>
+    </ul>
+    <p class="mb-0">
+      Runtime in multiline mode reads column 1 as metric identity and starts value columns from <code>VAL2</code>.
+      This is how per-row metric routing works.
+    </p>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <h2 class="h5">Runtime Constraints and Errors</h2>
+    <ul class="mb-0">
+      <li>More than 10 returned columns results in <code>config_error</code>.</li>
+      <li>Single mode with 0 rows => <code>nodata</code>; multiple rows => <code>data_error</code>.</li>
+      <li>Multiline duplicate metric names in one run produce <code>unexpected_multilne</code> data errors.</li>
+      <li>Unknown datasource or invalid DSN produces <code>config_error</code>.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <h2 class="h5">Related Docs</h2>
+    <ul class="mb-0">
+      <li><a href="{% url 'targets:help_topic' 'ai-migration' %}">AI-Assisted Alarm Migration</a></li>
+      <li><a href="{% url 'targets:help_topic' 'metrics' %}">Metrics Tab Help</a></li>
+      <li><a href="{% url 'targets:help_topic' 'config' %}">Config Tab Help</a></li>
+      <li><a href="{% url 'targets:help_topic' 'engine' %}">Engine Documentation</a></li>
+    </ul>
+  </div>
+</div>
+{% endblock %}

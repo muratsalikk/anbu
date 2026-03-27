@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Data Sources | ANBU UI{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h1 class="h3 mb-1">Data Source</h1>
+    <div class="text-muted small">Select a data source to edit its data source info.</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{% url 'targets:settings' %}">Back to ANBU Settings</a>
+    <a class="btn btn-primary" href="{% url 'targets:datasource_new' %}">Add Data Source</a>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <div class="table-responsive table-grid-wrap-md">
+      <table class="table table-sm table-hover table-bordered align-middle mb-0">
+        <thead class="table-light sticky-top">
+          <tr>
+            <th>Name</th>
+            <th>TYPE</th>
+            <th>USER</th>
+            <th>DSN</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+            <tr>
+              <td><a href="{{ row.edit_url }}">{{ row.name }}</a></td>
+              <td>{{ row.type }}</td>
+              <td>{{ row.user }}</td>
+              <td>{{ row.dsn }}</td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="4" class="text-center text-muted">No data sources found.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,2033 @@
+{% extends "base.html" %}
+{% block title %}{{ page_title }}{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <h1 class="h3 mb-0">{{ page_title }}</h1>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{% if is_edit %}{% url 'targets:detail' target_name %}{% else %}{% url 'targets:list' %}{% endif %}">Cancel</a>
+    <button type="submit" form="target-form" class="btn btn-primary">Save Target</button>
+  </div>
+</div>
+
+<form method="post" id="target-form">
+  {% csrf_token %}
+  <input type="hidden" name="change_notes" id="target-change-notes-input" value="">
+  {{ form.original_name }}
+  {{ form.original_query_file }}
+  {{ form.sql_text }}
+  {% if form.non_field_errors %}
+    <div class="alert alert-danger">
+      {% for err in form.non_field_errors %}<div>{{ err }}</div>{% endfor %}
+    </div>
+  {% endif %}
+  {% if form.errors %}
+    <div class="alert alert-danger">
+      {% for field in form %}
+        {% for err in field.errors %}
+          <div>{{ field.label }}: {{ err }}</div>
+        {% endfor %}
+      {% endfor %}
+    </div>
+  {% endif %}
+
+  <ul class="nav nav-tabs mb-0" id="target-edit-tabs" role="tablist">
+    <li class="nav-item" role="presentation">
+      <button class="nav-link active" id="tab-config" data-bs-toggle="tab" data-bs-target="#pane-config" type="button" role="tab" aria-controls="pane-config" aria-selected="true">Config</button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="tab-sql" data-bs-toggle="tab" data-bs-target="#pane-sql" type="button" role="tab" aria-controls="pane-sql" aria-selected="false">SQL</button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="tab-metrics" data-bs-toggle="tab" data-bs-target="#pane-metrics" type="button" role="tab" aria-controls="pane-metrics" aria-selected="false">Metrics</button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="tab-audit" data-bs-toggle="tab" data-bs-target="#pane-audit" type="button" role="tab" aria-controls="pane-audit" aria-selected="false">Audit</button>
+    </li>
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="tab-history" data-bs-toggle="tab" data-bs-target="#pane-history" type="button" role="tab" aria-controls="pane-history" aria-selected="false">History</button>
+    </li>
+    {% if document_url_value %}
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="tab-document" data-bs-toggle="tab" data-bs-target="#pane-document" type="button" role="tab" aria-controls="pane-document" aria-selected="false">Document</button>
+      </li>
+    {% endif %}
+    {% if dashboard_url_value %}
+      <li class="nav-item" role="presentation">
+        <button class="nav-link" id="tab-dashboard" data-bs-toggle="tab" data-bs-target="#pane-dashboard" type="button" role="tab" aria-controls="pane-dashboard" aria-selected="false">Dashboard</button>
+      </li>
+    {% endif %}
+  </ul>
+
+  <div class="tab-content border border-top-0 rounded-bottom p-3 mb-3 bg-white" id="target-edit-tab-content">
+    <div class="tab-pane fade show active" id="pane-config" role="tabpanel" aria-labelledby="tab-config">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="h6 mb-0">Config</h2>
+        <a
+          class="btn btn-outline-secondary btn-sm anbu-help-icon"
+          href="{% url 'targets:help_topic' 'config' %}"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Config help"
+          aria-label="Config help">?</a>
+      </div>
+      <div class="row g-3">
+        <div class="col-12 col-md-4">
+          <label class="form-label" for="{{ form.target_name.id_for_label }}">Target Name</label>
+          {{ form.target_name }}
+        </div>
+        <div class="col-6 col-md-2">
+          <div class="form-check mt-4">
+            {{ form.is_active }} <label class="form-check-label" for="{{ form.is_active.id_for_label }}">Active</label>
+          </div>
+        </div>
+        <div class="col-6 col-md-2">
+          <div class="form-check mt-4">
+            {{ form.is_muted }} <label class="form-check-label" for="{{ form.is_muted.id_for_label }}">Muted</label>
+          </div>
+        </div>
+        <div class="col-12">
+          <label class="form-label" for="{{ form.description.id_for_label }}">Description</label>
+          {{ form.description }}
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label" for="{{ form.document_url.id_for_label }}">Document URL</label>
+          {{ form.document_url }}
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label" for="{{ form.dashboard_url.id_for_label }}">Dashboard URL</label>
+          {{ form.dashboard_url }}
+        </div>
+        <div class="col-12 col-md-4">
+          <label class="form-label" for="{{ form.tag_list.id_for_label }}">Tags</label>
+          {{ form.tag_list }}
+        </div>
+        <div class="col-12 col-md-4">
+          <label class="form-label" for="{{ form.schedule_cron.id_for_label }}">Schedule Cron</label>
+          {{ form.schedule_cron }}
+        </div>
+      </div>
+
+      <hr>
+      <h2 class="h6">Mute Policies</h2>
+      <div class="row g-3">
+        <div class="col-12">
+          <div class="form-check mt-4">
+            {{ form.mute_between_enabled }}
+            <label class="form-check-label" for="{{ form.mute_between_enabled.id_for_label }}">Mute Between</label>
+          </div>
+        </div>
+
+        <div class="col-12 d-none">
+          {{ form.mute_between_rules }}
+        </div>
+
+        <div class="col-12" id="mute-between-panel">
+          <div id="mute-between-rows" class="d-flex flex-column gap-2"></div>
+          <button type="button" id="mute-between-add-btn" class="btn btn-outline-primary btn-sm mt-2" title="Add mute between rule" aria-label="Add mute between rule">+</button>
+        </div>
+
+        <div class="col-12">
+          <div class="form-check mt-4">
+            {{ form.mute_until_enabled }}
+            <label class="form-check-label" for="{{ form.mute_until_enabled.id_for_label }}">Mute Until</label>
+          </div>
+        </div>
+
+        <div class="col-12 d-none">
+          {{ form.mute_until }}
+        </div>
+        <div class="col-12 col-md-6" id="mute-until-panel">
+          <label class="form-label" for="mute-until-picker">Mute Until Datetime</label>
+          <input type="datetime-local" id="mute-until-picker" class="form-control">
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-pane fade" id="pane-sql" role="tabpanel" aria-labelledby="tab-sql">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="h6 mb-0">SQL</h2>
+        <a
+          class="btn btn-outline-secondary btn-sm anbu-help-icon"
+          href="{% url 'targets:help_topic' 'sql' %}"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="SQL help"
+          aria-label="SQL help">?</a>
+      </div>
+      <div class="row g-3 mb-3">
+        <div class="col-12 col-md-4">
+          <label class="form-label" for="{{ form.data_source.id_for_label }}">Datasource</label>
+          {{ form.data_source }}
+        </div>
+        <div class="col-12 col-md-3">
+          <label class="form-label" for="{{ form.sql_mode.id_for_label }}">SQL Mode</label>
+          {{ form.sql_mode }}
+        </div>
+        <div class="col-6 col-md-2">
+          <label class="form-label" for="{{ form.sql_timeout_sec.id_for_label }}">Timeout(sec)</label>
+          {{ form.sql_timeout_sec }}
+        </div>
+        <div class="col-6 col-md-2">
+          <label class="form-label" for="{{ form.sql_jitter_sec.id_for_label }}">Jitter(sec)</label>
+          {{ form.sql_jitter_sec }}
+        </div>
+      </div>
+
+      <div id="target-form-sql-editor" class="ace-box mb-3"></div>
+      <div class="alert alert-light border small">
+        Single-line SQL must return one row. Multiline SQL must return one row per metric. Only read-only SQL is allowed.
+      </div>
+
+      <h2 class="h6">Mappings</h2>
+      <div id="mapping-hidden-inputs" class="d-none">
+        {% for field in form %}
+          {% if "map_val" in field.name %}
+            {{ field }}
+          {% endif %}
+        {% endfor %}
+      </div>
+      <div id="mapping-builder-panel" class="mb-3">
+        <div id="mapping-rows" class="d-flex flex-column gap-2"></div>
+        <button type="button" class="btn btn-outline-primary btn-sm mt-2" id="mapping-add-btn">+ Add Mapping</button>
+      </div>
+      <div class="alert alert-light border small mb-0">
+        Use mapping aliases to reference returned SQL values in metric conditions and messages.
+      </div>
+    </div>
+
+    <div class="tab-pane fade" id="pane-metrics" role="tabpanel" aria-labelledby="tab-metrics">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="h6 mb-0">Metrics</h2>
+        <a
+          class="btn btn-outline-secondary btn-sm anbu-help-icon"
+          href="{% url 'targets:help_topic' 'metrics' %}"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Metrics help"
+          aria-label="Metrics help">?</a>
+      </div>
+      <div id="metrics-json-fallback">
+        <h2 class="h6">Metrics JSON</h2>
+        {{ form.metrics_json }}
+      </div>
+
+      <div id="metrics-builder-panel" class="d-none">
+        <div id="metrics-builder" class="d-flex flex-column gap-3"></div>
+        <div class="d-flex flex-wrap gap-2 mt-3">
+          <button type="button" class="btn btn-outline-primary btn-sm" id="metrics-add-btn">Add Metric</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="metrics-duplicate-btn">Duplicate Metric</button>
+          <button type="button" class="btn btn-outline-danger btn-sm" id="metrics-remove-btn">Remove Metric</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-pane fade" id="pane-audit" role="tabpanel" aria-labelledby="tab-audit">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="h6 mb-0">Audit History</h2>
+        <a
+          class="btn btn-outline-secondary btn-sm anbu-help-icon"
+          href="{% url 'targets:help_topic' 'audit' %}"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Audit help"
+          aria-label="Audit help">?</a>
+      </div>
+      {% if is_edit %}
+        {% if audit_rows %}
+          <div class="table-responsive table-grid-wrap-md">
+            <table class="table table-sm table-striped table-bordered align-middle mb-0">
+              <thead class="table-light sticky-top">
+                <tr>
+                  <th>Last Edited At</th>
+                  <th>Last Edited By</th>
+                  <th>Change Notes</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in audit_rows %}
+                  <tr>
+                    <td>{{ row.last_edited_at }}</td>
+                    <td>{{ row.last_edited_by }}</td>
+                    <td class="text-break">{{ row.change_notes }}</td>
+                    <td class="text-nowrap">
+                      <div class="d-flex gap-2">
+                        <a class="btn btn-outline-secondary btn-sm" href="{{ row.view_url }}" target="_blank" rel="noopener noreferrer">View</a>
+                        <a class="btn btn-outline-secondary btn-sm" href="{{ row.changes_url }}" target="_blank" rel="noopener noreferrer">View Changes</a>
+                        <button
+                          type="button"
+                          class="btn btn-outline-danger btn-sm audit-restore-btn"
+                          data-restore-url="{{ row.restore_url }}"
+                          {% if row.is_latest %}disabled title="Current snapshot"{% endif %}>Restore</button>
+                      </div>
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="alert alert-light border mb-0">No audit records found.</div>
+        {% endif %}
+      {% else %}
+        <div class="alert alert-light border mb-0">Save the target to view audit history.</div>
+      {% endif %}
+    </div>
+
+    <div class="tab-pane fade" id="pane-history" role="tabpanel" aria-labelledby="tab-history">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <h2 class="h6 mb-0">Status History</h2>
+        <a
+          class="btn btn-outline-secondary btn-sm anbu-help-icon"
+          href="{% url 'targets:help_topic' 'history' %}"
+          target="_blank"
+          rel="noopener noreferrer"
+          title="History help"
+          aria-label="History help">?</a>
+      </div>
+      {% if is_edit %}
+        <div class="row g-2 mb-3 align-items-end">
+          <div class="col-12 col-md-4">
+            <label class="form-label" for="history-metric-filter">Metric</label>
+            <select id="history-metric-filter" class="form-select form-select-sm">
+              <option value="" {% if not selected_metric %}selected{% endif %}>All metrics</option>
+              {% for metric in history_metrics %}
+                <option value="{{ metric }}" {% if selected_metric == metric %}selected{% endif %}>{{ metric }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          <div class="col-12 col-md-8">
+            <div class="d-flex flex-wrap justify-content-md-end gap-2">
+              <button type="button" class="btn btn-outline-secondary btn-sm" id="history-view-raw-btn">View Raw Instance</button>
+              <button type="button" class="btn btn-outline-danger btn-sm" id="history-delete-btn">Delete History</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm" id="history-refresh-btn">Refresh</button>
+              <button type="button" class="btn btn-success btn-sm" id="history-run-normal-btn">Run Normal Action</button>
+              <button type="button" class="btn btn-primary btn-sm" id="history-import-btn">Import History</button>
+            </div>
+          </div>
+        </div>
+        {% if postgres_error %}
+          <div class="alert alert-warning">data_store error: {{ postgres_error }}</div>
+        {% elif history_rows %}
+          <div class="table-responsive table-grid-wrap-md">
+            <table class="table table-sm table-striped table-bordered align-middle mb-0">
+              <thead class="table-light sticky-top">
+                <tr>
+                  <th>Metric</th>
+                  <th>Severity</th>
+                  <th>State</th>
+                  <th>Started At</th>
+                  <th>Ended At</th>
+                  <th>Message</th>
+                  <th>Action</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in history_rows %}
+                  <tr>
+                    <td>{{ row.metric_name }}</td>
+                    <td>{{ row.severity }}</td>
+                    <td>{{ row.state }}</td>
+                    <td>{{ row.started_at }}</td>
+                    <td>{{ row.ended_at }}</td>
+                    <td>{{ row.last_message }}</td>
+                    <td>{{ row.last_action }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="alert alert-light border mb-0">No history found.</div>
+        {% endif %}
+      {% else %}
+        <div class="alert alert-light border mb-0">Save the target to view status history.</div>
+      {% endif %}
+    </div>
+
+    {% if document_url_value %}
+      <div class="tab-pane fade" id="pane-document" role="tabpanel" aria-labelledby="tab-document">
+        <h2 class="h6">Document</h2>
+        <iframe src="{{ document_url_value }}" class="w-100 border rounded mb-2" style="min-height: 800px;" loading="lazy"></iframe>
+        <a href="{{ document_url_value }}" target="_blank" rel="noopener noreferrer">{{ document_url_value }}</a>
+      </div>
+    {% endif %}
+
+    {% if dashboard_url_value %}
+      <div class="tab-pane fade" id="pane-dashboard" role="tabpanel" aria-labelledby="tab-dashboard">
+        <h2 class="h6">Dashboard</h2>
+        <iframe src="{{ dashboard_url_value }}" class="w-100 border rounded mb-2" style="min-height: 800px;" loading="lazy"></iframe>
+        <a href="{{ dashboard_url_value }}" target="_blank" rel="noopener noreferrer">{{ dashboard_url_value }}</a>
+      </div>
+    {% endif %}
+  </div>
+
+</form>
+
+<div class="modal fade" id="targetChangeNotesModal" tabindex="-1" aria-labelledby="targetChangeNotesModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-sm modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title fs-6" id="targetChangeNotesModalLabel">Change Notes</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <label class="form-label small mb-1" for="target-change-notes-field">Change notes (optional)</label>
+        <input
+          type="text"
+          class="form-control form-control-sm"
+          id="target-change-notes-field"
+          autocomplete="off">
+        <button type="button" class="btn btn-success btn-sm mt-3 w-100" id="target-change-notes-submit-btn">Submit</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if is_edit %}
+  <div class="modal fade" id="historyRawModal" tabindex="-1" aria-labelledby="historyRawModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title fs-5" id="historyRawModalLabel">Raw Instances</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body" id="history-raw-body">
+          <div class="text-muted small">Raw instances are loaded on demand.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="historyDeleteModal" tabindex="-1" aria-labelledby="historyDeleteModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title fs-5" id="historyDeleteModalLabel">Delete History</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-2">Delete all history records for this target?</p>
+          <div class="small" id="history-delete-feedback"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-danger btn-sm" id="history-delete-confirm-btn">Delete</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="historyImportModal" tabindex="-1" aria-labelledby="historyImportModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg modal-dialog-scrollable">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title fs-5" id="historyImportModalLabel">Import History</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted small mb-2">
+            SQL must return: <code>dttm</code>, <code>metric_name</code>, <code>value</code>.
+          </p>
+          <textarea id="history-import-sql-hidden" class="d-none">{{ history_import_sql }}</textarea>
+          <div id="history-import-sql-editor" class="ace-box" style="min-height: 320px;"></div>
+          <div class="small mt-2" id="history-import-feedback"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+          <button type="button" class="btn btn-primary btn-sm" id="history-import-run-btn">Import</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal fade" id="historyRunNormalModal" tabindex="-1" aria-labelledby="historyRunNormalModalLabel" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title fs-5" id="historyRunNormalModalLabel">Run Normal Actions</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted small mb-2">
+            Runs configured normal actions using current metric values with severity <code>1</code>.
+            If Metric is <strong>All metrics</strong>, all non-normal metrics are processed from their latest execution.
+          </p>
+          <label class="form-label" for="history-run-normal-message">Message</label>
+          <textarea id="history-run-normal-message" class="form-control" rows="3"></textarea>
+          <div id="history-run-normal-progress-wrap" class="d-none mt-3" aria-live="polite" aria-busy="true">
+            <div class="small text-muted mb-1">Running actions...</div>
+            <div class="progress">
+              <div
+                class="progress-bar bg-success progress-bar-striped progress-bar-animated"
+                role="progressbar"
+                aria-valuenow="100"
+                aria-valuemin="0"
+                aria-valuemax="100"
+                style="width: 75%;"></div>
+            </div>
+          </div>
+          <label class="form-label mt-3" for="history-run-normal-output">Execution Output</label>
+          <textarea id="history-run-normal-output" class="form-control font-monospace" rows="10" readonly></textarea>
+          <div class="small mt-2" id="history-run-normal-feedback"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-success btn-sm" id="history-run-normal-confirm-btn">Run</button>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endif %}
+
+{{ action_options|json_script:"target-action-options" }}
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function() {
+    const betweenDays = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
+    const operatorOptions = ["", "=", "<", ">", "=<", "=>"];
+    const operatorNormalize = {
+      "==": "=",
+      "<=": "=<",
+      ">=": "=>",
+    };
+    const betweenEnabled = document.getElementById("id_mute_between_enabled");
+    const betweenHidden = document.getElementById("id_mute_between_rules");
+    const betweenPanel = document.getElementById("mute-between-panel");
+    const betweenRows = document.getElementById("mute-between-rows");
+    const betweenAddBtn = document.getElementById("mute-between-add-btn");
+    const untilEnabled = document.getElementById("id_mute_until_enabled");
+    const untilHidden = document.getElementById("id_mute_until");
+    const untilPanel = document.getElementById("mute-until-panel");
+    const untilPicker = document.getElementById("mute-until-picker");
+    const metricsFallback = document.getElementById("metrics-json-fallback");
+    const metricsPanel = document.getElementById("metrics-builder-panel");
+    const metricsContainer = document.getElementById("metrics-builder");
+    const metricsHiddenInput = document.getElementById("id_metrics_json");
+    const metricsAddBtn = document.getElementById("metrics-add-btn");
+    const metricsDuplicateBtn = document.getElementById("metrics-duplicate-btn");
+    const metricsRemoveBtn = document.getElementById("metrics-remove-btn");
+    const actionOptionsScript = document.getElementById("target-action-options");
+    const mappingRows = document.getElementById("mapping-rows");
+    const mappingAddBtn = document.getElementById("mapping-add-btn");
+    const mapInputs = Array.from({ length: 10 }, function(_, idx) {
+      return document.getElementById("id_map_val" + String(idx + 1));
+    }).filter(Boolean);
+    const sqlModeInput = document.getElementById("id_sql_mode");
+
+    let mappingState = [];
+    let mappingBuilderBound = false;
+    let metricsState = [];
+    let selectedMetricIndex = 0;
+    let metricsBuilderEnabled = false;
+    let actionOptions = [];
+    if (actionOptionsScript) {
+      try {
+        const parsed = JSON.parse(actionOptionsScript.textContent || "[]");
+        if (Array.isArray(parsed)) {
+          actionOptions = parsed
+            .map((value) => String(value || "").trim())
+            .filter((value) => value);
+        }
+      } catch (e) {
+        actionOptions = [];
+      }
+    }
+
+    function parseBetweenRules(value) {
+      try {
+        const parsed = JSON.parse(String(value || "").trim() || "[]");
+        if (!Array.isArray(parsed)) return [];
+        return parsed
+          .filter((item) => item && typeof item === "object")
+          .map((item) => {
+            const days = Array.isArray(item.days)
+              ? item.days.map((d) => String(d || "").trim().toUpperCase()).filter((d) => betweenDays.includes(d))
+              : [];
+            return {
+              start: String(item.start || "").slice(0, 5),
+              end: String(item.end || "").slice(0, 5),
+              days: days.length ? days : [...betweenDays],
+            };
+          })
+          .filter((item) => item.start && item.end);
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function makeBetweenRow(rule) {
+      const row = document.createElement("div");
+      row.className = "border rounded p-2";
+      const daysChecks = betweenDays
+        .map((day) => {
+          const checked = rule.days.includes(day) ? "checked" : "";
+          return (
+            '<label class="form-check form-check-inline me-2">' +
+              '<input class="form-check-input mute-between-day" type="checkbox" value="' + day + '" ' + checked + '>' +
+              '<span class="form-check-label small">' + day + '</span>' +
+            '</label>'
+          );
+        })
+        .join("");
+      row.innerHTML =
+        '<div class="row g-2 align-items-end">' +
+          '<div class="col-6 col-md-2">' +
+            '<label class="form-label small">Start</label>' +
+            '<input type="time" class="form-control form-control-sm mute-between-start" value="' + (rule.start || "00:00") + '">' +
+          '</div>' +
+          '<div class="col-6 col-md-2">' +
+            '<label class="form-label small">End</label>' +
+            '<input type="time" class="form-control form-control-sm mute-between-end" value="' + (rule.end || "00:00") + '">' +
+          '</div>' +
+          '<div class="col-10 col-md-7">' +
+            '<label class="form-label small d-block">Days</label>' +
+            daysChecks +
+          '</div>' +
+          '<div class="col-2 col-md-1 text-end">' +
+            '<button type="button" class="btn btn-outline-danger btn-sm mute-between-remove-btn" title="Remove rule" aria-label="Remove rule">&#128465;</button>' +
+          '</div>' +
+        '</div>';
+      const removeBtn = row.querySelector(".mute-between-remove-btn");
+      removeBtn.addEventListener("click", function() {
+        row.remove();
+      });
+      return row;
+    }
+
+    function addBetweenRule(rule) {
+      if (!betweenRows) return;
+      betweenRows.appendChild(makeBetweenRow(rule || { start: "23:00", end: "06:00", days: [...betweenDays] }));
+    }
+
+    function syncBetweenRulesToHidden() {
+      if (!betweenHidden || !betweenRows || !betweenEnabled) return;
+      if (!betweenEnabled.checked) {
+        betweenHidden.value = "";
+        return;
+      }
+      const rules = [];
+      const rows = betweenRows.querySelectorAll(".border");
+      rows.forEach((row) => {
+        const start = String((row.querySelector(".mute-between-start") || {}).value || "").trim();
+        const end = String((row.querySelector(".mute-between-end") || {}).value || "").trim();
+        const dayNodes = row.querySelectorAll(".mute-between-day:checked");
+        const days = Array.from(dayNodes).map((node) => String(node.value || "").trim().toUpperCase());
+        if (start && end && days.length) {
+          rules.push({ start, end, days });
+        }
+      });
+      betweenHidden.value = rules.length ? JSON.stringify(rules) : "";
+    }
+
+    function isMultilineSqlMode() {
+      return String((sqlModeInput && sqlModeInput.value) || "single").trim().toLowerCase() === "multiline";
+    }
+
+    function getMapInput(index) {
+      return document.getElementById("id_map_val" + String(index));
+    }
+
+    function normalizeAlias(value) {
+      return String(value || "").trim().toUpperCase();
+    }
+
+    function readMappingStateFromHidden() {
+      const multiline = isMultilineSqlMode();
+      const loaded = [];
+      if (multiline) {
+        loaded.push({ valIndex: 1, alias: "METRIC_NAME" });
+      }
+      for (let idx = 1; idx <= 10; idx += 1) {
+        if (multiline && idx === 1) {
+          continue;
+        }
+        const input = getMapInput(idx);
+        const alias = normalizeAlias((input && input.value) || "");
+        if (alias) {
+          loaded.push({ valIndex: idx, alias: alias });
+        }
+      }
+      if (multiline) {
+        if (!loaded.some((item) => item.valIndex === 2)) {
+          loaded.push({ valIndex: 2, alias: "" });
+        }
+      } else if (!loaded.length) {
+        loaded.push({ valIndex: 1, alias: "" });
+      }
+      loaded.sort((a, b) => a.valIndex - b.valIndex);
+      mappingState = loaded;
+    }
+
+    function clearHiddenMappings() {
+      for (let idx = 1; idx <= 10; idx += 1) {
+        const input = getMapInput(idx);
+        if (!input) {
+          continue;
+        }
+        input.value = "";
+      }
+    }
+
+    function refreshMetricsFromMapping() {
+      if (!metricsBuilderEnabled) {
+        return;
+      }
+      renderMetricsBuilder();
+      syncMetricsToHidden();
+    }
+
+    function syncMappingStateToHidden() {
+      clearHiddenMappings();
+      const multiline = isMultilineSqlMode();
+      if (!mappingState.length) {
+        mappingState = multiline
+          ? [{ valIndex: 1, alias: "METRIC_NAME" }, { valIndex: 2, alias: "" }]
+          : [{ valIndex: 1, alias: "" }];
+      }
+      const seen = new Set();
+      mappingState = mappingState
+        .map((item) => ({
+          valIndex: Number(item.valIndex),
+          alias: normalizeAlias(item.alias),
+        }))
+        .filter((item) => Number.isInteger(item.valIndex) && item.valIndex >= 1 && item.valIndex <= 10)
+        .filter((item) => {
+          if (seen.has(item.valIndex)) {
+            return false;
+          }
+          seen.add(item.valIndex);
+          return true;
+        })
+        .sort((a, b) => a.valIndex - b.valIndex);
+
+      if (multiline) {
+        const rowOne = mappingState.find((item) => item.valIndex === 1);
+        if (rowOne) {
+          rowOne.alias = "METRIC_NAME";
+        } else {
+          mappingState.unshift({ valIndex: 1, alias: "METRIC_NAME" });
+        }
+        if (!mappingState.some((item) => item.valIndex !== 1)) {
+          mappingState.push({ valIndex: 2, alias: "" });
+        }
+      }
+
+      mappingState.forEach((item) => {
+        const input = getMapInput(item.valIndex);
+        if (!input) {
+          return;
+        }
+        input.value = normalizeAlias(item.alias);
+      });
+      refreshMetricsFromMapping();
+    }
+
+    function getNextMappingIndex() {
+      const multiline = isMultilineSqlMode();
+      const start = multiline ? 2 : 1;
+      const used = new Set(mappingState.map((item) => item.valIndex));
+      for (let idx = start; idx <= 10; idx += 1) {
+        if (!used.has(idx)) {
+          return idx;
+        }
+      }
+      return 0;
+    }
+
+    function removeMapping(valIndex) {
+      const multiline = isMultilineSqlMode();
+      if (multiline && valIndex === 1) {
+        return;
+      }
+      mappingState = mappingState.filter((item) => item.valIndex !== valIndex);
+      if (multiline && !mappingState.some((item) => item.valIndex !== 1)) {
+        mappingState.push({ valIndex: 2, alias: "" });
+      }
+      if (!multiline && !mappingState.length) {
+        mappingState = [{ valIndex: 1, alias: "" }];
+      }
+      renderMappingBuilder();
+      syncMappingStateToHidden();
+    }
+
+    function renderMappingBuilder() {
+      if (!mappingRows) {
+        return;
+      }
+      mappingRows.innerHTML = "";
+      const multiline = isMultilineSqlMode();
+      mappingState.sort((a, b) => a.valIndex - b.valIndex);
+
+      mappingState.forEach((item) => {
+        const row = document.createElement("div");
+        row.className = "border rounded p-2";
+
+        const inner = document.createElement("div");
+        inner.className = "row g-2 align-items-end";
+
+        const valCol = document.createElement("div");
+        valCol.className = "col-12 col-md-3";
+        const valLabel = document.createElement("label");
+        valLabel.className = "form-label small";
+        valLabel.textContent = "Value";
+        valCol.appendChild(valLabel);
+        const valField = document.createElement("input");
+        valField.type = "text";
+        valField.className = "form-control form-control-sm";
+        valField.value = "VAL" + String(item.valIndex);
+        valField.readOnly = true;
+        valCol.appendChild(valField);
+        inner.appendChild(valCol);
+
+        const aliasCol = document.createElement("div");
+        aliasCol.className = "col-12 col-md-8";
+        const aliasLabel = document.createElement("label");
+        aliasLabel.className = "form-label small";
+        aliasLabel.textContent = "Alias";
+        aliasCol.appendChild(aliasLabel);
+        const aliasInput = document.createElement("input");
+        aliasInput.type = "text";
+        aliasInput.className = "form-control form-control-sm";
+        aliasInput.value = normalizeAlias(item.alias);
+        const aliasReadonly = multiline && item.valIndex === 1;
+        aliasInput.readOnly = aliasReadonly;
+        if (aliasReadonly) {
+          aliasInput.value = "METRIC_NAME";
+        }
+        aliasInput.addEventListener("input", function(event) {
+          item.alias = normalizeAlias(event.target.value);
+          event.target.value = item.alias;
+          syncMappingStateToHidden();
+        });
+        aliasCol.appendChild(aliasInput);
+        inner.appendChild(aliasCol);
+
+        const removeCol = document.createElement("div");
+        removeCol.className = "col-12 col-md-1 text-end";
+        const editableCount = mappingState.filter((entry) => !(multiline && entry.valIndex === 1)).length;
+        const canRemove = multiline
+          ? item.valIndex !== 1
+          : editableCount > 1;
+        if (canRemove) {
+          const removeBtn = document.createElement("button");
+          removeBtn.type = "button";
+          removeBtn.className = "btn btn-outline-danger btn-sm";
+          removeBtn.title = "Remove mapping";
+          removeBtn.setAttribute("aria-label", "Remove mapping");
+          removeBtn.innerHTML = "&#128465;";
+          removeBtn.addEventListener("click", function() {
+            removeMapping(item.valIndex);
+          });
+          removeCol.appendChild(removeBtn);
+        }
+        inner.appendChild(removeCol);
+
+        row.appendChild(inner);
+        mappingRows.appendChild(row);
+      });
+
+      if (mappingAddBtn) {
+        const nextIndex = getNextMappingIndex();
+        mappingAddBtn.disabled = nextIndex === 0;
+      }
+    }
+
+    function initMappingBuilder() {
+      if (!mappingRows || !mappingAddBtn) {
+        return;
+      }
+      readMappingStateFromHidden();
+      renderMappingBuilder();
+      syncMappingStateToHidden();
+
+      if (mappingBuilderBound) {
+        return;
+      }
+      mappingBuilderBound = true;
+
+      mappingAddBtn.addEventListener("click", function() {
+        const nextIndex = getNextMappingIndex();
+        if (!nextIndex) {
+          return;
+        }
+        mappingState.push({ valIndex: nextIndex, alias: "" });
+        mappingState.sort((a, b) => a.valIndex - b.valIndex);
+        renderMappingBuilder();
+        syncMappingStateToHidden();
+      });
+
+      if (sqlModeInput) {
+        sqlModeInput.addEventListener("change", function() {
+          readMappingStateFromHidden();
+          renderMappingBuilder();
+          syncMappingStateToHidden();
+        });
+      }
+    }
+
+    function defaultCondition() {
+      return {
+        OPERATOR: "=",
+        VAL: "",
+        ACTION: "",
+        MSG: "",
+      };
+    }
+
+    function normalizeOperator(raw) {
+      const value = String(raw || "").trim();
+      const normalized = operatorNormalize[value] || value;
+      if (!operatorOptions.includes(normalized)) {
+        return "";
+      }
+      return normalized;
+    }
+
+    function normalizeCondition(raw) {
+      if (!raw || typeof raw !== "object") {
+        return defaultCondition();
+      }
+      return {
+        OPERATOR: normalizeOperator(raw.OPERATOR),
+        VAL: String(raw.VAL || "").trim(),
+        ACTION: String(raw.ACTION || "").trim(),
+        MSG: String(raw.MSG || "").trim(),
+      };
+    }
+
+    function normalizeSeverity(raw, forceOne) {
+      let conditions = [];
+      if (Array.isArray(raw)) {
+        conditions = raw.map((item) => normalizeCondition(item));
+      }
+      if (forceOne && conditions.length === 0) {
+        conditions = [defaultCondition()];
+      }
+      return conditions;
+    }
+
+    function normalizeMetric(raw) {
+      const metric = raw && typeof raw === "object" ? raw : {};
+      return {
+        NAME: String(metric.NAME || "").trim(),
+        VALUE: String(metric.VALUE || "").trim(),
+        NORMAL_ACTION: String(metric.NORMAL_ACTION || "").trim(),
+        NORMAL_MSG: String(metric.NORMAL_MSG || "").trim(),
+        CRITICAL: normalizeSeverity(metric.CRITICAL, true),
+        MAJOR: normalizeSeverity(metric.MAJOR, false),
+        MINOR: normalizeSeverity(metric.MINOR, false),
+      };
+    }
+
+    function dedupe(values) {
+      const seen = new Set();
+      const out = [];
+      values.forEach((item) => {
+        const value = String(item || "").trim();
+        if (!value || seen.has(value)) {
+          return;
+        }
+        seen.add(value);
+        out.push(value);
+      });
+      return out;
+    }
+
+    function getMappingInfo() {
+      const aliases = [];
+      const valueOptions = [];
+      for (let idx = 1; idx <= 10; idx += 1) {
+        const input = document.getElementById("id_map_val" + String(idx));
+        const alias = String((input && input.value) || "").trim().toUpperCase();
+        if (alias) {
+          aliases.push(alias);
+          valueOptions.push(alias);
+        } else {
+          valueOptions.push("VAL" + String(idx));
+        }
+      }
+      return {
+        aliases: dedupe(aliases),
+        valueOptions: dedupe(valueOptions),
+      };
+    }
+
+    function getMetricValueOptions(currentValue) {
+      const mappingInfo = getMappingInfo();
+      const options = [...mappingInfo.valueOptions];
+      const current = String(currentValue || "").trim();
+      if (current && !options.includes(current)) {
+        options.push(current);
+      }
+      if (!options.length) {
+        options.push("VAL1");
+      }
+      return options;
+    }
+
+    function getConditionValueOptions(currentValue) {
+      const mappingInfo = getMappingInfo();
+      const values = dedupe(
+        [
+          "BASELINE",
+          "DEVIATION",
+          "TARGET_NAME",
+          "METRIC_NAME",
+          "CONDITION_VALUE",
+          ...mappingInfo.valueOptions,
+          ...mappingInfo.aliases,
+          String(currentValue || "").trim(),
+        ]
+      );
+      return values;
+    }
+
+    function getActionOptions(currentAction) {
+      const values = dedupe(["", ...actionOptions, String(currentAction || "").trim()]);
+      if (!values.length) {
+        return [""];
+      }
+      return values;
+    }
+
+    function createMetricDefault() {
+      const valueOptions = getMetricValueOptions("");
+      return {
+        NAME: "",
+        VALUE: valueOptions[0] || "VAL1",
+        NORMAL_ACTION: "",
+        NORMAL_MSG: "",
+        CRITICAL: [defaultCondition()],
+        MAJOR: [],
+        MINOR: [],
+      };
+    }
+
+    function getMaxMetricCount() {
+      const sqlMode = String((sqlModeInput && sqlModeInput.value) || "single").trim().toLowerCase();
+      return sqlMode === "multiline" ? 100 : 10;
+    }
+
+    function readMetricsStateFromHidden() {
+      if (!metricsHiddenInput) {
+        return false;
+      }
+      const text = String(metricsHiddenInput.value || "").trim();
+      if (!text) {
+        metricsState = [createMetricDefault()];
+        selectedMetricIndex = 0;
+        return true;
+      }
+      try {
+        const parsed = JSON.parse(text);
+        if (!Array.isArray(parsed)) {
+          return false;
+        }
+        metricsState = parsed.map((item) => normalizeMetric(item));
+        if (metricsState.length === 0) {
+          metricsState = [createMetricDefault()];
+        }
+        selectedMetricIndex = 0;
+        return true;
+      } catch (e) {
+        return false;
+      }
+    }
+
+    function getSelectedMetricIndex() {
+      if (!metricsContainer) {
+        return selectedMetricIndex;
+      }
+      const openItem = metricsContainer.querySelector("details[data-metric-index][open]");
+      if (openItem) {
+        const idx = Number(openItem.getAttribute("data-metric-index"));
+        if (Number.isInteger(idx) && idx >= 0 && idx < metricsState.length) {
+          return idx;
+        }
+      }
+      if (selectedMetricIndex < 0 || selectedMetricIndex >= metricsState.length) {
+        return Math.max(0, metricsState.length - 1);
+      }
+      return selectedMetricIndex;
+    }
+
+    function syncMetricsToHidden() {
+      if (!metricsHiddenInput || !metricsBuilderEnabled) {
+        return;
+      }
+      metricsHiddenInput.value = JSON.stringify(metricsState, null, 2);
+    }
+
+    function buildSelect(options, currentValue, onChange) {
+      const select = document.createElement("select");
+      select.className = "form-select form-select-sm";
+      options.forEach((value) => {
+        const option = document.createElement("option");
+        option.value = value;
+        option.textContent = value || "---------";
+        select.appendChild(option);
+      });
+      select.value = String(currentValue || "");
+      select.addEventListener("change", onChange);
+      return select;
+    }
+
+    function buildValueInput(currentValue, datalistId, valueOptions, onChange) {
+      const wrapper = document.createElement("div");
+      const input = document.createElement("input");
+      input.type = "text";
+      input.className = "form-control form-control-sm";
+      input.value = String(currentValue || "");
+      input.setAttribute("list", datalistId);
+      input.addEventListener("input", onChange);
+      wrapper.appendChild(input);
+
+      const datalist = document.createElement("datalist");
+      datalist.id = datalistId;
+      valueOptions.forEach((value) => {
+        const option = document.createElement("option");
+        option.value = value;
+        datalist.appendChild(option);
+      });
+      wrapper.appendChild(datalist);
+      return { wrapper, input };
+    }
+
+    function renderConditionSection(metric, metricIndex, severityName, label, requiredMinimum) {
+      const section = document.createElement("div");
+      section.className = "border rounded p-2 mt-3";
+
+      const title = document.createElement("div");
+      title.className = "fw-semibold mb-2";
+      title.textContent = label;
+      section.appendChild(title);
+
+      const conditions = Array.isArray(metric[severityName]) ? metric[severityName] : [];
+      conditions.forEach((condition, conditionIndex) => {
+        const row = document.createElement("div");
+        row.className = "row g-2 align-items-end mb-2";
+
+        const opCol = document.createElement("div");
+        opCol.className = "col-6 col-md-2";
+        const opLabel = document.createElement("label");
+        opLabel.className = "form-label small";
+        opLabel.textContent = "Op";
+        opCol.appendChild(opLabel);
+        const opSelect = buildSelect(
+          dedupe([...operatorOptions, condition.OPERATOR]),
+          condition.OPERATOR,
+          function(event) {
+            metric[severityName][conditionIndex].OPERATOR = normalizeOperator(event.target.value);
+            syncMetricsToHidden();
+          }
+        );
+        opCol.appendChild(opSelect);
+        row.appendChild(opCol);
+
+        const valCol = document.createElement("div");
+        valCol.className = "col-6 col-md-2";
+        const valLabel = document.createElement("label");
+        valLabel.className = "form-label small";
+        valLabel.textContent = "Val";
+        valCol.appendChild(valLabel);
+        const datalistId = "metric-" + String(metricIndex) + "-" + severityName.toLowerCase() + "-val-" + String(conditionIndex);
+        const valueInput = buildValueInput(
+          condition.VAL,
+          datalistId,
+          getConditionValueOptions(condition.VAL),
+          function(event) {
+            metric[severityName][conditionIndex].VAL = String(event.target.value || "").trim();
+            syncMetricsToHidden();
+          }
+        );
+        valCol.appendChild(valueInput.wrapper);
+        row.appendChild(valCol);
+
+        const actionCol = document.createElement("div");
+        actionCol.className = "col-12 col-md-3";
+        const actionLabel = document.createElement("label");
+        actionLabel.className = "form-label small";
+        actionLabel.textContent = "Action";
+        actionCol.appendChild(actionLabel);
+        const actionSelect = buildSelect(
+          getActionOptions(condition.ACTION),
+          condition.ACTION,
+          function(event) {
+            metric[severityName][conditionIndex].ACTION = String(event.target.value || "").trim();
+            syncMetricsToHidden();
+          }
+        );
+        actionCol.appendChild(actionSelect);
+        row.appendChild(actionCol);
+
+        const msgCol = document.createElement("div");
+        msgCol.className = "col-12 col-md-5";
+        const msgLabel = document.createElement("label");
+        msgLabel.className = "form-label small";
+        msgLabel.textContent = "Msg";
+        msgCol.appendChild(msgLabel);
+        const msgInput = document.createElement("input");
+        msgInput.type = "text";
+        msgInput.maxLength = 280;
+        msgInput.className = "form-control form-control-sm";
+        msgInput.value = condition.MSG;
+        msgInput.addEventListener("input", function(event) {
+          metric[severityName][conditionIndex].MSG = String(event.target.value || "");
+          syncMetricsToHidden();
+        });
+        msgCol.appendChild(msgInput);
+        row.appendChild(msgCol);
+
+        section.appendChild(row);
+      });
+
+      const controls = document.createElement("div");
+      controls.className = "d-flex flex-wrap gap-2";
+
+      const addBtn = document.createElement("button");
+      addBtn.type = "button";
+      addBtn.className = "btn btn-outline-primary btn-sm";
+      addBtn.textContent = "Add " + label;
+      addBtn.addEventListener("click", function() {
+        metric[severityName].push(defaultCondition());
+        renderMetricsBuilder();
+        syncMetricsToHidden();
+      });
+      controls.appendChild(addBtn);
+
+      const minCount = requiredMinimum ? 1 : 0;
+      if (conditions.length > minCount) {
+        const removeBtn = document.createElement("button");
+        removeBtn.type = "button";
+        removeBtn.className = "btn btn-outline-danger btn-sm";
+        removeBtn.textContent = "Remove " + label;
+        removeBtn.addEventListener("click", function() {
+          if (metric[severityName].length > minCount) {
+            metric[severityName].pop();
+            renderMetricsBuilder();
+            syncMetricsToHidden();
+          }
+        });
+        controls.appendChild(removeBtn);
+      }
+
+      section.appendChild(controls);
+      return section;
+    }
+
+    function renderMetricsBuilder() {
+      if (!metricsContainer) {
+        return;
+      }
+      if (!Array.isArray(metricsState) || metricsState.length === 0) {
+        metricsState = [createMetricDefault()];
+      }
+      selectedMetricIndex = getSelectedMetricIndex();
+      metricsContainer.innerHTML = "";
+
+      metricsState.forEach((metric, metricIndex) => {
+        const details = document.createElement("details");
+        details.className = "border rounded p-2";
+        details.setAttribute("data-metric-index", String(metricIndex));
+        details.open = metricIndex === selectedMetricIndex;
+
+        const summary = document.createElement("summary");
+        summary.className = "fw-semibold";
+        const summaryTitle = document.createElement("span");
+        const metricName = String(metric.NAME || "").trim();
+        summaryTitle.textContent = "Metric " + String(metricIndex + 1) + (metricName ? " - " + metricName : "");
+        summary.appendChild(summaryTitle);
+        summary.addEventListener("click", function() {
+          selectedMetricIndex = metricIndex;
+        });
+        details.appendChild(summary);
+
+        const body = document.createElement("div");
+        body.className = "pt-3";
+
+        const row1 = document.createElement("div");
+        row1.className = "row g-2";
+
+        const nameCol = document.createElement("div");
+        nameCol.className = "col-12 col-md-6";
+        const nameLabel = document.createElement("label");
+        nameLabel.className = "form-label";
+        nameLabel.textContent = "Name";
+        nameCol.appendChild(nameLabel);
+        const nameInput = document.createElement("input");
+        nameInput.type = "text";
+        nameInput.className = "form-control form-control-sm";
+        nameInput.value = metric.NAME;
+        nameInput.addEventListener("input", function(event) {
+          metric.NAME = String(event.target.value || "").trim();
+          const title = "Metric " + String(metricIndex + 1) + (metric.NAME ? " - " + metric.NAME : "");
+          summaryTitle.textContent = title;
+          syncMetricsToHidden();
+        });
+        nameCol.appendChild(nameInput);
+        row1.appendChild(nameCol);
+
+        const valueCol = document.createElement("div");
+        valueCol.className = "col-12 col-md-6";
+        const valueLabel = document.createElement("label");
+        valueLabel.className = "form-label";
+        valueLabel.textContent = "Value";
+        valueCol.appendChild(valueLabel);
+        const valueSelect = buildSelect(
+          getMetricValueOptions(metric.VALUE),
+          metric.VALUE,
+          function(event) {
+            metric.VALUE = String(event.target.value || "").trim();
+            syncMetricsToHidden();
+          }
+        );
+        valueCol.appendChild(valueSelect);
+        row1.appendChild(valueCol);
+
+        body.appendChild(row1);
+
+        const row2 = document.createElement("div");
+        row2.className = "row g-2 mt-1";
+
+        const normalActionCol = document.createElement("div");
+        normalActionCol.className = "col-12 col-md-4";
+        const normalActionLabel = document.createElement("label");
+        normalActionLabel.className = "form-label";
+        normalActionLabel.textContent = "Normal Action";
+        normalActionCol.appendChild(normalActionLabel);
+        const normalActionSelect = buildSelect(
+          getActionOptions(metric.NORMAL_ACTION),
+          metric.NORMAL_ACTION,
+          function(event) {
+            metric.NORMAL_ACTION = String(event.target.value || "").trim();
+            syncMetricsToHidden();
+          }
+        );
+        normalActionCol.appendChild(normalActionSelect);
+        row2.appendChild(normalActionCol);
+
+        const normalMsgCol = document.createElement("div");
+        normalMsgCol.className = "col-12 col-md-8";
+        const normalMsgLabel = document.createElement("label");
+        normalMsgLabel.className = "form-label";
+        normalMsgLabel.textContent = "Normal Msg";
+        normalMsgCol.appendChild(normalMsgLabel);
+        const normalMsgInput = document.createElement("input");
+        normalMsgInput.type = "text";
+        normalMsgInput.maxLength = 280;
+        normalMsgInput.className = "form-control";
+        normalMsgInput.value = metric.NORMAL_MSG;
+        normalMsgInput.addEventListener("input", function(event) {
+          metric.NORMAL_MSG = String(event.target.value || "");
+          syncMetricsToHidden();
+        });
+        normalMsgCol.appendChild(normalMsgInput);
+        row2.appendChild(normalMsgCol);
+
+        body.appendChild(row2);
+        body.appendChild(renderConditionSection(metric, metricIndex, "CRITICAL", "Critical", true));
+
+        if (!metric.MAJOR.length) {
+          const addMajorBtn = document.createElement("button");
+          addMajorBtn.type = "button";
+          addMajorBtn.className = "btn btn-outline-secondary btn-sm mt-3";
+          addMajorBtn.textContent = "Add Major";
+          addMajorBtn.addEventListener("click", function() {
+            metric.MAJOR = [defaultCondition()];
+            renderMetricsBuilder();
+            syncMetricsToHidden();
+          });
+          body.appendChild(addMajorBtn);
+        } else {
+          body.appendChild(renderConditionSection(metric, metricIndex, "MAJOR", "Major", false));
+          const removeMajorBtn = document.createElement("button");
+          removeMajorBtn.type = "button";
+          removeMajorBtn.className = "btn btn-outline-danger btn-sm mt-2";
+          removeMajorBtn.textContent = "Remove Major";
+          removeMajorBtn.addEventListener("click", function() {
+            metric.MAJOR = [];
+            renderMetricsBuilder();
+            syncMetricsToHidden();
+          });
+          body.appendChild(removeMajorBtn);
+        }
+
+        if (!metric.MINOR.length) {
+          const addMinorBtn = document.createElement("button");
+          addMinorBtn.type = "button";
+          addMinorBtn.className = "btn btn-outline-secondary btn-sm mt-3";
+          addMinorBtn.textContent = "Add Minor";
+          addMinorBtn.addEventListener("click", function() {
+            metric.MINOR = [defaultCondition()];
+            renderMetricsBuilder();
+            syncMetricsToHidden();
+          });
+          body.appendChild(addMinorBtn);
+        } else {
+          body.appendChild(renderConditionSection(metric, metricIndex, "MINOR", "Minor", false));
+          const removeMinorBtn = document.createElement("button");
+          removeMinorBtn.type = "button";
+          removeMinorBtn.className = "btn btn-outline-danger btn-sm mt-2";
+          removeMinorBtn.textContent = "Remove Minor";
+          removeMinorBtn.addEventListener("click", function() {
+            metric.MINOR = [];
+            renderMetricsBuilder();
+            syncMetricsToHidden();
+          });
+          body.appendChild(removeMinorBtn);
+        }
+
+        details.appendChild(body);
+        metricsContainer.appendChild(details);
+      });
+    }
+
+    function initMetricsBuilder() {
+      if (!metricsHiddenInput || !metricsContainer || !metricsPanel) {
+        return;
+      }
+      if (!readMetricsStateFromHidden()) {
+        metricsBuilderEnabled = false;
+        return;
+      }
+      metricsBuilderEnabled = true;
+      if (metricsFallback) {
+        metricsFallback.classList.add("d-none");
+      }
+      metricsPanel.classList.remove("d-none");
+
+      renderMetricsBuilder();
+      syncMetricsToHidden();
+
+      if (metricsAddBtn) {
+        metricsAddBtn.addEventListener("click", function() {
+          const maxMetrics = getMaxMetricCount();
+          if (metricsState.length >= maxMetrics) {
+            window.alert("Maximum of " + String(maxMetrics) + " metrics.");
+            return;
+          }
+          metricsState.push(createMetricDefault());
+          selectedMetricIndex = metricsState.length - 1;
+          renderMetricsBuilder();
+          syncMetricsToHidden();
+        });
+      }
+
+      if (metricsDuplicateBtn) {
+        metricsDuplicateBtn.addEventListener("click", function() {
+          const maxMetrics = getMaxMetricCount();
+          if (metricsState.length >= maxMetrics) {
+            window.alert("Maximum of " + String(maxMetrics) + " metrics.");
+            return;
+          }
+          const sourceIndex = getSelectedMetricIndex();
+          const sourceMetric = metricsState[sourceIndex] || metricsState[metricsState.length - 1];
+          const duplicate = JSON.parse(JSON.stringify(sourceMetric));
+          if (duplicate.NAME) {
+            duplicate.NAME = String(duplicate.NAME) + "_COPY";
+          }
+          metricsState.push(normalizeMetric(duplicate));
+          selectedMetricIndex = metricsState.length - 1;
+          renderMetricsBuilder();
+          syncMetricsToHidden();
+        });
+      }
+
+      if (metricsRemoveBtn) {
+        metricsRemoveBtn.addEventListener("click", function() {
+          if (metricsState.length <= 1) {
+            window.alert("At least one metric is required.");
+            return;
+          }
+          const targetIndex = getSelectedMetricIndex();
+          metricsState.splice(targetIndex, 1);
+          selectedMetricIndex = Math.max(0, targetIndex - 1);
+          renderMetricsBuilder();
+          syncMetricsToHidden();
+        });
+      }
+
+      mapInputs.forEach((input) => {
+        input.addEventListener("change", function() {
+          renderMetricsBuilder();
+          syncMetricsToHidden();
+        });
+      });
+    }
+
+    function toDatetimeLocal(raw) {
+      const text = String(raw || "").trim();
+      if (!text) return "";
+      const normalized = text.replace(" ", "T").slice(0, 19);
+      const dt = new Date(normalized);
+      if (!Number.isNaN(dt.getTime())) {
+        const y = dt.getFullYear();
+        const m = String(dt.getMonth() + 1).padStart(2, "0");
+        const d = String(dt.getDate()).padStart(2, "0");
+        const h = String(dt.getHours()).padStart(2, "0");
+        const mi = String(dt.getMinutes()).padStart(2, "0");
+        return y + "-" + m + "-" + d + "T" + h + ":" + mi;
+      }
+      return normalized.slice(0, 16);
+    }
+
+    function syncUntilToHidden() {
+      if (!untilHidden || !untilEnabled || !untilPicker) return;
+      if (!untilEnabled.checked) {
+        untilHidden.value = "";
+        return;
+      }
+      const raw = String(untilPicker.value || "").trim();
+      untilHidden.value = raw ? raw.replace("T", " ") + ":00" : "";
+    }
+
+    function refreshMutePanels() {
+      if (betweenPanel && betweenEnabled) {
+        betweenPanel.classList.toggle("d-none", !betweenEnabled.checked);
+      }
+      if (untilPanel && untilEnabled) {
+        untilPanel.classList.toggle("d-none", !untilEnabled.checked);
+      }
+    }
+
+    if (betweenRows && betweenHidden) {
+      const existingRules = parseBetweenRules(betweenHidden.value);
+      if (existingRules.length) {
+        existingRules.forEach((rule) => addBetweenRule(rule));
+      }
+    }
+    if (betweenAddBtn) {
+      betweenAddBtn.addEventListener("click", function() {
+        addBetweenRule();
+      });
+    }
+    if (betweenEnabled) {
+      betweenEnabled.addEventListener("change", function() {
+        if (betweenEnabled.checked && betweenRows && betweenRows.children.length === 0) {
+          addBetweenRule();
+        }
+        refreshMutePanels();
+      });
+      if (betweenEnabled.checked && betweenRows && betweenRows.children.length === 0) {
+        addBetweenRule();
+      }
+    }
+    if (untilPicker && untilHidden) {
+      untilPicker.value = toDatetimeLocal(untilHidden.value);
+    }
+    if (untilEnabled) {
+      untilEnabled.addEventListener("change", refreshMutePanels);
+    }
+    refreshMutePanels();
+
+    const tabStorageKey = "anbu_target_edit_active_tab";
+    const savedTab = localStorage.getItem(tabStorageKey);
+    if (savedTab) {
+      const trigger = document.querySelector('#target-edit-tabs button[data-bs-target="' + savedTab + '"]');
+      if (trigger) {
+        bootstrap.Tab.getOrCreateInstance(trigger).show();
+      }
+    }
+    const tabTriggers = document.querySelectorAll("#target-edit-tabs button[data-bs-toggle='tab']");
+    tabTriggers.forEach((tab) => {
+      tab.addEventListener("shown.bs.tab", function(event) {
+        const target = event.target.getAttribute("data-bs-target");
+        if (target) {
+          localStorage.setItem(tabStorageKey, target);
+        }
+      });
+    });
+
+    initMappingBuilder();
+    initMetricsBuilder();
+
+    const hiddenSqlInput = document.getElementById("id_sql_text");
+    const initialSql = hiddenSqlInput ? hiddenSqlInput.value : "";
+    const editor = window.ANBU.initAce("target-form-sql-editor", initialSql, {
+      mode: "ace/mode/sql",
+      theme: "ace/theme/github",
+      readOnly: false,
+    });
+    const form = document.getElementById("target-form");
+    const changeNotesInput = document.getElementById("target-change-notes-input");
+    const changeNotesModalNode = document.getElementById("targetChangeNotesModal");
+    const changeNotesField = document.getElementById("target-change-notes-field");
+    const changeNotesSubmitBtn = document.getElementById("target-change-notes-submit-btn");
+    const changeNotesModal =
+      changeNotesModalNode && changeNotesField && changeNotesSubmitBtn
+        ? bootstrap.Modal.getOrCreateInstance(changeNotesModalNode)
+        : null;
+    let allowSubmitWithNotes = false;
+
+    if (form) {
+      form.addEventListener("submit", function(event) {
+        if (changeNotesModal && !allowSubmitWithNotes) {
+          event.preventDefault();
+          changeNotesField.value = changeNotesInput
+            ? String(changeNotesInput.value || "")
+            : "";
+          changeNotesModal.show();
+          window.setTimeout(function() {
+            changeNotesField.focus();
+            changeNotesField.select();
+          }, 100);
+          return;
+        }
+        allowSubmitWithNotes = false;
+        if (hiddenSqlInput && editor) {
+          hiddenSqlInput.value = editor.getValue();
+        }
+        syncMappingStateToHidden();
+        syncBetweenRulesToHidden();
+        syncUntilToHidden();
+        syncMetricsToHidden();
+      });
+
+      if (changeNotesModal && changeNotesSubmitBtn && changeNotesField) {
+        changeNotesSubmitBtn.addEventListener("click", function() {
+          if (changeNotesInput) {
+            changeNotesInput.value = String(changeNotesField.value || "").trim();
+          }
+          allowSubmitWithNotes = true;
+          changeNotesModal.hide();
+          if (form.requestSubmit) {
+            form.requestSubmit();
+            return;
+          }
+          if (hiddenSqlInput && editor) {
+            hiddenSqlInput.value = editor.getValue();
+          }
+          syncMappingStateToHidden();
+          syncBetweenRulesToHidden();
+          syncUntilToHidden();
+          syncMetricsToHidden();
+          form.submit();
+        });
+      }
+    }
+
+    const metricFilter = document.getElementById("history-metric-filter");
+    if (metricFilter) {
+      metricFilter.addEventListener("change", function() {
+        const url = new URL(window.location.href);
+        const value = String(metricFilter.value || "").trim();
+        if (value) {
+          url.searchParams.set("history_metric", value);
+        } else {
+          url.searchParams.delete("history_metric");
+        }
+        window.location.href = url.toString();
+      });
+    }
+
+    function getSelectedHistoryMetricFromDropdown() {
+      if (!metricFilter) {
+        return "";
+      }
+      return String(metricFilter.value || "").trim().toUpperCase();
+    }
+
+    {% if is_edit %}
+      const historyInstancesUrl = "{% url 'targets:history_instances' edit_target_name %}";
+      const historyDeleteUrl = "{% url 'targets:history_delete' edit_target_name %}";
+      const historyImportUrl = "{% url 'targets:history_import' edit_target_name %}";
+      const historyRunNormalUrl = "{% url 'targets:history_run_normal_actions' edit_target_name %}";
+
+      function getCsrfToken() {
+        const cookieParts = document.cookie ? document.cookie.split(";") : [];
+        for (let i = 0; i < cookieParts.length; i += 1) {
+          const value = cookieParts[i].trim();
+          if (value.startsWith("csrftoken=")) {
+            return decodeURIComponent(value.slice("csrftoken=".length));
+          }
+        }
+        return "";
+      }
+
+      function setFeedback(node, kind, message, errors) {
+        if (!node) {
+          return;
+        }
+        node.className = "small mt-2";
+        if (!message) {
+          node.textContent = "";
+          return;
+        }
+        if (kind === "danger") {
+          node.classList.add("text-danger");
+        } else if (kind === "success") {
+          node.classList.add("text-success");
+        } else {
+          node.classList.add("text-muted");
+        }
+        if (Array.isArray(errors) && errors.length) {
+          node.textContent = message + " " + errors.join(" | ");
+        } else {
+          node.textContent = message;
+        }
+      }
+
+      function renderRawRows(rows, container) {
+        if (!container) {
+          return;
+        }
+        container.innerHTML = "";
+        if (!Array.isArray(rows) || rows.length === 0) {
+          const empty = document.createElement("div");
+          empty.className = "alert alert-light border mb-0";
+          empty.textContent = "No records found.";
+          container.appendChild(empty);
+          return;
+        }
+        const headers = Object.keys(rows[0]);
+        const wrapper = document.createElement("div");
+        wrapper.className = "table-responsive table-grid-wrap-lg";
+        const table = document.createElement("table");
+        table.className = "table table-sm table-striped table-bordered align-middle mb-0";
+        const thead = document.createElement("thead");
+        thead.className = "table-light sticky-top";
+        const headerRow = document.createElement("tr");
+        headers.forEach((key) => {
+          const th = document.createElement("th");
+          th.textContent = key;
+          headerRow.appendChild(th);
+        });
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+
+        const tbody = document.createElement("tbody");
+        rows.forEach((row) => {
+          const tr = document.createElement("tr");
+          headers.forEach((key) => {
+            const td = document.createElement("td");
+            const value = row[key];
+            td.textContent = value === null || value === undefined ? "" : String(value);
+            tr.appendChild(td);
+          });
+          tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+        wrapper.appendChild(table);
+        container.appendChild(wrapper);
+      }
+
+      const refreshBtn = document.getElementById("history-refresh-btn");
+      if (refreshBtn) {
+        refreshBtn.addEventListener("click", function() {
+          window.location.reload();
+        });
+      }
+
+      const rawModalNode = document.getElementById("historyRawModal");
+      const rawBody = document.getElementById("history-raw-body");
+      const viewRawBtn = document.getElementById("history-view-raw-btn");
+      if (rawModalNode && viewRawBtn) {
+        const rawModal = bootstrap.Modal.getOrCreateInstance(rawModalNode);
+        viewRawBtn.addEventListener("click", async function() {
+          rawModal.show();
+          if (rawBody) {
+            rawBody.innerHTML = '<div class="text-muted">Loading raw instances...</div>';
+          }
+          try {
+            const response = await fetch(historyInstancesUrl, {
+              method: "GET",
+              headers: { "X-Requested-With": "XMLHttpRequest" },
+            });
+            const payload = await response.json();
+            if (!response.ok || !payload.ok) {
+              const message = payload && payload.error ? payload.error : "Failed to load raw instances.";
+              throw new Error(message);
+            }
+            renderRawRows(payload.rows || [], rawBody);
+          } catch (error) {
+            if (rawBody) {
+              rawBody.innerHTML = '<div class="alert alert-danger mb-0"></div>';
+              const alertNode = rawBody.querySelector(".alert");
+              if (alertNode) {
+                alertNode.textContent = error && error.message ? error.message : "Failed to load raw instances.";
+              }
+            }
+          }
+        });
+      }
+
+      const deleteModalNode = document.getElementById("historyDeleteModal");
+      const deleteFeedback = document.getElementById("history-delete-feedback");
+      const deleteBtn = document.getElementById("history-delete-btn");
+      const deleteConfirmBtn = document.getElementById("history-delete-confirm-btn");
+      if (deleteModalNode && deleteBtn && deleteConfirmBtn) {
+        const deleteModal = bootstrap.Modal.getOrCreateInstance(deleteModalNode);
+        deleteBtn.addEventListener("click", function() {
+          setFeedback(deleteFeedback, "muted", "", []);
+          deleteModal.show();
+        });
+        deleteConfirmBtn.addEventListener("click", async function() {
+          deleteConfirmBtn.disabled = true;
+          setFeedback(deleteFeedback, "muted", "Deleting...", []);
+          try {
+            const response = await fetch(historyDeleteUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+                "X-CSRFToken": getCsrfToken(),
+                "X-Requested-With": "XMLHttpRequest",
+              },
+              body: new URLSearchParams(),
+            });
+            const payload = await response.json();
+            if (!response.ok || !payload.ok) {
+              const message = payload && payload.error ? payload.error : "Delete failed.";
+              throw new Error(message);
+            }
+            setFeedback(
+              deleteFeedback,
+              "success",
+              "Deleted " + String(payload.deleted || 0) + " records.",
+              []
+            );
+            window.setTimeout(function() {
+              window.location.reload();
+            }, 600);
+          } catch (error) {
+            setFeedback(
+              deleteFeedback,
+              "danger",
+              error && error.message ? error.message : "Delete failed.",
+              []
+            );
+            deleteConfirmBtn.disabled = false;
+          }
+        });
+      }
+
+      let historyImportEditor = null;
+      const importModalNode = document.getElementById("historyImportModal");
+      const importBtn = document.getElementById("history-import-btn");
+      const importRunBtn = document.getElementById("history-import-run-btn");
+      const importFeedback = document.getElementById("history-import-feedback");
+      const importSqlHidden = document.getElementById("history-import-sql-hidden");
+      const importSqlEditorNode = document.getElementById("history-import-sql-editor");
+
+      function ensureImportEditor() {
+        if (historyImportEditor || !importSqlEditorNode) {
+          return;
+        }
+        const initialSql = importSqlHidden ? importSqlHidden.value : "";
+        historyImportEditor = window.ANBU.initAce("history-import-sql-editor", initialSql, {
+          mode: "ace/mode/sql",
+          theme: "ace/theme/github",
+          readOnly: false,
+        });
+      }
+
+      if (importModalNode && importBtn) {
+        const importModal = bootstrap.Modal.getOrCreateInstance(importModalNode);
+        importBtn.addEventListener("click", function() {
+          setFeedback(importFeedback, "muted", "", []);
+          importModal.show();
+        });
+        importModalNode.addEventListener("shown.bs.modal", function() {
+          ensureImportEditor();
+        });
+        if (importRunBtn) {
+          importRunBtn.addEventListener("click", async function() {
+            ensureImportEditor();
+            importRunBtn.disabled = true;
+            setFeedback(importFeedback, "muted", "Importing...", []);
+            const sql = historyImportEditor ? historyImportEditor.getValue() : (importSqlHidden ? importSqlHidden.value : "");
+            try {
+              const response = await fetch(historyImportUrl, {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+                  "X-CSRFToken": getCsrfToken(),
+                  "X-Requested-With": "XMLHttpRequest",
+                },
+                body: new URLSearchParams({ sql: sql || "" }),
+              });
+              const payload = await response.json();
+              if (!response.ok || !payload.ok) {
+                const message = payload && payload.error ? payload.error : "Import failed.";
+                const errors = payload && Array.isArray(payload.errors) ? payload.errors : [];
+                setFeedback(importFeedback, "danger", message, errors);
+                importRunBtn.disabled = false;
+                return;
+              }
+              setFeedback(
+                importFeedback,
+                "success",
+                "Import successful. Inserted " + String(payload.inserted || 0) + " rows.",
+                []
+              );
+              window.setTimeout(function() {
+                window.location.reload();
+              }, 700);
+            } catch (error) {
+              setFeedback(
+                importFeedback,
+                "danger",
+                error && error.message ? error.message : "Import failed.",
+                []
+              );
+              importRunBtn.disabled = false;
+            }
+          });
+        }
+      }
+
+      const runNormalBtn = document.getElementById("history-run-normal-btn");
+      const runNormalModalNode = document.getElementById("historyRunNormalModal");
+      const runNormalConfirmBtn = document.getElementById("history-run-normal-confirm-btn");
+      const runNormalMessageInput = document.getElementById("history-run-normal-message");
+      const runNormalFeedback = document.getElementById("history-run-normal-feedback");
+      const runNormalProgressWrap = document.getElementById("history-run-normal-progress-wrap");
+      const runNormalOutput = document.getElementById("history-run-normal-output");
+
+      function buildRunNormalOutput(payload) {
+        const directOutput = payload && typeof payload.output_text === "string"
+          ? payload.output_text
+          : "";
+        if (directOutput.trim()) {
+          return directOutput;
+        }
+        const results = payload && Array.isArray(payload.results) ? payload.results : [];
+        const chunks = [];
+        results.forEach((result) => {
+          const lines = [
+            "Metric: " + String(result && result.metric_name ? result.metric_name : ""),
+            "Status: " + String(result && result.status ? result.status : ""),
+          ];
+          if (result && result.exit_status !== undefined && result.exit_status !== null) {
+            lines.push("Exit: " + String(result.exit_status));
+          }
+          if (result && result.detail) {
+            lines.push("Detail: " + String(result.detail));
+          }
+          if (result && result.stdout) {
+            lines.push("STDOUT:");
+            lines.push(String(result.stdout));
+          }
+          if (result && result.stderr) {
+            lines.push("STDERR:");
+            lines.push(String(result.stderr));
+          }
+          chunks.push(lines.join("\n"));
+        });
+        return chunks.join("\n\n---\n\n");
+      }
+
+      if (runNormalBtn && runNormalModalNode && runNormalConfirmBtn) {
+        const runNormalModal = bootstrap.Modal.getOrCreateInstance(runNormalModalNode);
+        runNormalBtn.addEventListener("click", function() {
+          setFeedback(runNormalFeedback, "muted", "", []);
+          if (runNormalMessageInput) {
+            runNormalMessageInput.value = "";
+          }
+          if (runNormalOutput) {
+            runNormalOutput.value = "";
+          }
+          if (runNormalProgressWrap) {
+            runNormalProgressWrap.classList.add("d-none");
+          }
+          runNormalModal.show();
+        });
+
+        runNormalConfirmBtn.addEventListener("click", async function() {
+          const selectedMetric = getSelectedHistoryMetricFromDropdown();
+          const metricSelection = selectedMetric ? [selectedMetric] : ["ALL"];
+          const messageText = runNormalMessageInput ? String(runNormalMessageInput.value || "").trim() : "";
+          runNormalConfirmBtn.disabled = true;
+          setFeedback(runNormalFeedback, "muted", "Running...", []);
+          if (runNormalOutput) {
+            runNormalOutput.value = "";
+          }
+          if (runNormalProgressWrap) {
+            runNormalProgressWrap.classList.remove("d-none");
+          }
+          try {
+            const response = await fetch(historyRunNormalUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+                "X-CSRFToken": getCsrfToken(),
+                "X-Requested-With": "XMLHttpRequest",
+              },
+              body: new URLSearchParams({
+                metrics: JSON.stringify(metricSelection),
+                message: messageText,
+              }),
+            });
+            const payload = await response.json();
+            if (!response.ok || !payload.ok) {
+              const message = payload && payload.error ? payload.error : "Run normal actions failed.";
+              throw new Error(message);
+            }
+            const summary = payload.summary || {};
+            const summaryText =
+              "Requested: " + String(summary.requested || 0) +
+              ", Executed: " + String(summary.executed || 0) +
+              ", Success: " + String(summary.success || 0) +
+              ", Failed: " + String(summary.failed || 0) +
+              ", Skipped: " + String(summary.skipped || 0);
+            const kind = Number(summary.failed || 0) > 0 ? "danger" : "success";
+            setFeedback(runNormalFeedback, kind, summaryText, []);
+            if (runNormalOutput) {
+              runNormalOutput.value = buildRunNormalOutput(payload);
+            }
+          } catch (error) {
+            setFeedback(
+              runNormalFeedback,
+              "danger",
+              error && error.message ? error.message : "Run normal actions failed.",
+              []
+            );
+          } finally {
+            runNormalConfirmBtn.disabled = false;
+            if (runNormalProgressWrap) {
+              runNormalProgressWrap.classList.add("d-none");
+            }
+          }
+        });
+      }
+
+      const restoreButtons = document.querySelectorAll(".audit-restore-btn");
+      restoreButtons.forEach((button) => {
+        button.addEventListener("click", async function() {
+          const restoreUrl = String(button.getAttribute("data-restore-url") || "").trim();
+          if (!restoreUrl) {
+            return;
+          }
+          if (!window.confirm("are you sure")) {
+            return;
+          }
+          button.disabled = true;
+          try {
+            const response = await fetch(restoreUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+                "X-CSRFToken": getCsrfToken(),
+                "X-Requested-With": "XMLHttpRequest",
+              },
+              body: new URLSearchParams(),
+            });
+            const payload = await response.json();
+            if (!response.ok || !payload.ok) {
+              const message = payload && payload.error ? payload.error : "Restore failed.";
+              throw new Error(message);
+            }
+            window.alert("Restore completed.");
+            window.location.reload();
+          } catch (error) {
+            button.disabled = false;
+            window.alert(error && error.message ? error.message : "Restore failed.");
+          }
+        });
+      });
+    {% endif %}
+  })();
+</script>
+{% endblock %}

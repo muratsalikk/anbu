@@ -1,0 +1,90 @@
+{% extends "base.html" %}
+{% block title %}Targets | ANBU UI{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h1 class="h3 mb-1">Targets</h1>
+  </div>
+  <div class="d-flex gap-2">
+    <button
+      type="button"
+      class="btn btn-outline-primary"
+      data-bs-toggle="modal"
+      data-bs-target="#newTargetWithAiModal">New Target With AI</button>
+    <a class="btn btn-primary" href="{% url 'targets:new' %}">New Target</a>
+  </div>
+</div>
+
+<div id="targets-grid-wrapper">
+  {% include "partials/targets_grid.html" %}
+</div>
+
+<div class="modal fade" id="newTargetWithAiModal" tabindex="-1" aria-labelledby="newTargetWithAiModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <form method="post" action="{% url 'targets:new_with_ai' %}">
+        <div class="modal-header">
+          <h2 class="modal-title fs-5" id="newTargetWithAiModalLabel">New Target With AI</h2>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          {% csrf_token %}
+          <div class="alert alert-light border small mb-3">
+            Paste the copied prompt into available LLM and generate .env, .sql and optionally .hql content; then paste it here to continue. This part is a pre-integration feature.
+          </div>
+          <textarea id="ai-prompt-hidden" class="d-none" readonly>{{ ai_prompt_text }}</textarea>
+          <button type="button" id="copy-ai-prompt-btn" class="btn btn-outline-secondary w-100 mb-3">Copy Prompt</button>
+
+          <div class="mb-3">
+            <label class="form-label" for="id_ai_env_text">.env (required)</label>
+            <textarea id="id_ai_env_text" name="env_text" class="form-control font-monospace" rows="3" required></textarea>
+          </div>
+          <div class="mb-3">
+            <label class="form-label" for="id_ai_sql_text">.sql (required)</label>
+            <textarea id="id_ai_sql_text" name="sql_text" class="form-control font-monospace" rows="3" required></textarea>
+          </div>
+          <div class="mb-1">
+            <label class="form-label" for="id_ai_hql_text">.hql (optional)</label>
+            <textarea id="id_ai_hql_text" name="hql_text" class="form-control font-monospace" rows="3"></textarea>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="submit" class="btn btn-primary">Open In Target Edit</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function() {
+    const copyBtn = document.getElementById("copy-ai-prompt-btn");
+    const promptHidden = document.getElementById("ai-prompt-hidden");
+    if (!copyBtn || !promptHidden) {
+      return;
+    }
+    copyBtn.addEventListener("click", async function() {
+      const text = String(promptHidden.value || "").trim();
+      if (!text) {
+        return;
+      }
+      try {
+        await navigator.clipboard.writeText(text);
+      } catch (error) {
+        promptHidden.classList.remove("d-none");
+        promptHidden.focus();
+        promptHidden.select();
+        document.execCommand("copy");
+        promptHidden.classList.add("d-none");
+      }
+      copyBtn.textContent = "Copied";
+      window.setTimeout(function() {
+        copyBtn.textContent = "Copy Prompt";
+      }, 1200);
+    });
+  })();
+</script>
+{% endblock %}

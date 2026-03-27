@@ -1,0 +1,411 @@
+{% if rows %}
+  <div class="small text-muted mb-2">Rows: {{ rows|length }}</div>
+{% endif %}
+
+<form method="post" id="targets-action-form" class="mb-3">
+  {% csrf_token %}
+  <input type="hidden" name="selected_targets" id="selected-targets-input" value="[]">
+  <input type="hidden" name="return_query" value="{{ filter_query }}">
+  <input type="hidden" name="change_notes" id="targets-change-notes-input" value="">
+  <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+    <button type="submit" name="action" value="duplicate_selected" class="btn btn-outline-primary btn-sm">Duplicate</button>
+    <button
+      type="submit"
+      name="action"
+      value="deactivate_selected"
+      class="btn btn-outline-danger btn-sm">Deactivate selected</button>
+    <button type="submit" name="action" value="activate_selected" class="btn btn-outline-success btn-sm">Activate selected</button>
+    <button type="submit" name="action" value="unmute_selected" class="btn btn-outline-secondary btn-sm">Unmute selected</button>
+    <div class="d-flex align-items-center gap-2 ms-2">
+      <label class="small text-muted" for="mute_until_input">Mute until</label>
+      <input id="mute_until_input" type="datetime-local" name="mute_until" class="form-control form-control-sm">
+      <button type="submit" name="action" value="mute_until_selected" class="btn btn-outline-warning btn-sm">Apply</button>
+    </div>
+    <span class="badge text-bg-light border ms-auto">Selected: <span id="selected-count">0</span></span>
+  </div>
+</form>
+
+<div class="modal fade" id="targetsChangeNotesModal" tabindex="-1" aria-labelledby="targetsChangeNotesModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-sm modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title fs-6" id="targetsChangeNotesModalLabel">Change Notes</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <label class="form-label small mb-1" for="targets-change-notes-field">Change notes (optional)</label>
+        <input
+          type="text"
+          class="form-control form-control-sm"
+          id="targets-change-notes-field"
+          autocomplete="off">
+        <button type="button" class="btn btn-success btn-sm mt-3 w-100" id="targets-change-notes-submit-btn">Submit</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<form method="get" id="targets-filter-form" class="mb-3">
+  <div class="d-flex flex-wrap gap-2 align-items-center mb-2">
+    <button type="submit" class="btn btn-outline-secondary btn-sm">Filter</button>
+    <a href="{% url 'targets:list' %}" class="btn btn-outline-dark btn-sm">Reset</a>
+    <label class="small text-muted ms-2" for="sort_col">Column</label>
+    <select id="sort_col" name="sort_col" class="form-select form-select-sm" style="width: auto;">
+      <option value="target_name" {% if sort_col == "target_name" %}selected{% endif %}>Target</option>
+      <option value="description" {% if sort_col == "description" %}selected{% endif %}>Description</option>
+      <option value="schedule_cron" {% if sort_col == "schedule_cron" %}selected{% endif %}>Schedule</option>
+      <option value="data_source" {% if sort_col == "data_source" %}selected{% endif %}>Datasource</option>
+      <option value="tags" {% if sort_col == "tags" %}selected{% endif %}>Tags</option>
+      <option value="is_active" {% if sort_col == "is_active" %}selected{% endif %}>Active</option>
+      <option value="is_muted" {% if sort_col == "is_muted" %}selected{% endif %}>Muted</option>
+      <option value="severity" {% if sort_col == "severity" %}selected{% endif %}>Severity</option>
+      <option value="state" {% if sort_col == "state" %}selected{% endif %}>State</option>
+      <option value="last_run" {% if sort_col == "last_run" %}selected{% endif %}>Last Run</option>
+      <option value="last_edited_by" {% if sort_col == "last_edited_by" %}selected{% endif %}>Edited By</option>
+      <option value="last_edited_at" {% if sort_col == "last_edited_at" %}selected{% endif %}>Edited At</option>
+    </select>
+    <label class="small text-muted" for="sort_dir">Sort</label>
+    <select id="sort_dir" name="sort_dir" class="form-select form-select-sm" style="width: auto;">
+      <option value="asc" {% if sort_dir == "asc" %}selected{% endif %}>Ascending</option>
+      <option value="desc" {% if sort_dir == "desc" %}selected{% endif %}>Descending</option>
+    </select>
+    <div class="btn-group btn-group-sm ms-2" role="group" aria-label="View mode">
+      <input
+        type="radio"
+        class="btn-check"
+        name="view_mode"
+        id="view_mode_simple"
+        value="simple"
+        {% if view_mode != "detailed" %}checked{% endif %}>
+      <label class="btn btn-outline-primary" for="view_mode_simple">Simple</label>
+      <input
+        type="radio"
+        class="btn-check"
+        name="view_mode"
+        id="view_mode_detailed"
+        value="detailed"
+        {% if view_mode == "detailed" %}checked{% endif %}>
+      <label class="btn btn-outline-primary" for="view_mode_detailed">Detailed</label>
+    </div>
+  </div>
+  <div class="table-responsive targets-table-wrap">
+    <table class="table table-sm table-hover align-middle table-bordered mb-0">
+      <thead class="table-light sticky-top">
+        <tr>
+          <th class="text-center" style="width: 40px;">
+            <input type="checkbox" class="form-check-input" id="targets-select-all">
+          </th>
+          <th>Target</th>
+          {% if is_detailed_view %}
+            <th>Description</th>
+            <th>Tags</th>
+          {% endif %}
+          <th>Active</th>
+          <th>Muted</th>
+          <th>Severity</th>
+          <th>State</th>
+          <th>Last Run</th>
+          {% if is_detailed_view %}
+            <th>Datasource</th>
+            <th>Schedule</th>
+            <th>Edited By</th>
+            <th>Edited At</th>
+          {% else %}
+            <th>Schedule</th>
+          {% endif %}
+        </tr>
+        <tr>
+          <th></th>
+          <th><input class="form-control form-control-sm" name="f_target_name" value="{{ f_target_name }}" placeholder="contains"></th>
+          {% if is_detailed_view %}
+            <th><input class="form-control form-control-sm" name="f_description" value="{{ f_description }}" placeholder="contains"></th>
+            <th>
+              <select class="form-select form-select-sm" name="f_tags">
+                <option value="" {% if not f_tags %}selected{% endif %}></option>
+                {% for value in tag_options %}
+                  <option value="{{ value }}" {% if f_tags == value %}selected{% endif %}>{{ value }}</option>
+                {% endfor %}
+              </select>
+            </th>
+          {% endif %}
+          <th>
+            <select class="form-select form-select-sm" name="f_active">
+              <option value="" {% if not f_active %}selected{% endif %}></option>
+              <option value="yes" {% if f_active == 'yes' %}selected{% endif %}>Yes</option>
+              <option value="no" {% if f_active == 'no' %}selected{% endif %}>No</option>
+            </select>
+          </th>
+          <th>
+            <select class="form-select form-select-sm" name="f_muted">
+              <option value="" {% if not f_muted %}selected{% endif %}></option>
+              <option value="yes" {% if f_muted == 'yes' %}selected{% endif %}>Yes</option>
+              <option value="no" {% if f_muted == 'no' %}selected{% endif %}>No</option>
+            </select>
+          </th>
+          <th>
+            <select class="form-select form-select-sm" name="f_severity">
+              <option value="" {% if not f_severity %}selected{% endif %}></option>
+              {% for value in severity_options %}
+                <option value="{{ value }}" {% if f_severity == value %}selected{% endif %}>{{ value }}</option>
+              {% endfor %}
+            </select>
+          </th>
+          <th>
+            <select class="form-select form-select-sm" name="f_state">
+              <option value="" {% if not f_state %}selected{% endif %}></option>
+              {% for value in state_options %}
+                <option value="{{ value }}" {% if f_state == value %}selected{% endif %}>{{ value }}</option>
+              {% endfor %}
+            </select>
+          </th>
+          <th><input class="form-control form-control-sm" name="f_last_run" value="{{ f_last_run }}" placeholder="contains"></th>
+          {% if is_detailed_view %}
+            <th>
+              <select class="form-select form-select-sm" name="f_datasource">
+                <option value="" {% if not f_datasource %}selected{% endif %}></option>
+                {% for value in datasource_options %}
+                  <option value="{{ value }}" {% if f_datasource == value %}selected{% endif %}>{{ value }}</option>
+                {% endfor %}
+              </select>
+            </th>
+            <th><input class="form-control form-control-sm" name="f_schedule" value="{{ f_schedule }}" placeholder="contains"></th>
+            <th>
+              <select class="form-select form-select-sm" name="f_edited_by">
+                <option value="" {% if not f_edited_by %}selected{% endif %}></option>
+                {% for value in edited_by_options %}
+                  <option value="{{ value }}" {% if f_edited_by == value %}selected{% endif %}>{{ value }}</option>
+                {% endfor %}
+              </select>
+            </th>
+            <th><input class="form-control form-control-sm" name="f_edited_at" value="{{ f_edited_at }}" placeholder="contains"></th>
+          {% else %}
+            <th><input class="form-control form-control-sm" name="f_schedule" value="{{ f_schedule }}" placeholder="contains"></th>
+          {% endif %}
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in rows %}
+          <tr
+            class="
+              {% if 'error' in row.state|lower or 'fail' in row.state|lower or 'exception' in row.state|lower %}
+                severity-error
+              {% elif row.severity == 'CRITICAL' %}
+                severity-critical
+              {% elif row.severity == 'MAJOR' %}
+                severity-major
+              {% elif row.severity == 'MINOR' %}
+                severity-minor
+              {% elif row.severity == 'NORMAL'
+                  and row.state|default:''|lower != 'ok'
+                  and row.state|default:''|lower != 'success'
+                  and row.state|default:''|lower != 'succeeded' %}
+                severity-normal
+              {% endif %}
+            ">
+            <td class="text-center">
+              <input type="checkbox" class="form-check-input target-select" value="{{ row.target_name|upper }}">
+            </td>
+            <td><a class="anbu-target-name-link" href="{{ row.detail_url }}">{{ row.target_name }}</a></td>
+            {% if is_detailed_view %}
+              <td>{{ row.description }}</td>
+              <td>{{ row.tags }}</td>
+            {% endif %}
+            <td class="text-center">
+              <input
+                type="checkbox"
+                class="form-check-input"
+                {% if row.is_active %}checked{% endif %}
+                disabled
+                aria-label="Active">
+            </td>
+            <td class="text-center">
+              <input
+                type="checkbox"
+                class="form-check-input muted-indicator"
+                {% if row.is_muted %}checked{% endif %}
+                disabled
+                aria-label="Muted">
+            </td>
+            <td>
+              {% with sev=row.severity|default:''|upper %}
+                {% if sev == 'CRITICAL' %}
+                  <span class="badge text-bg-danger">CRITICAL</span>
+                {% elif sev == 'MAJOR' %}
+                  <span class="badge text-bg-warning">MAJOR</span>
+                {% elif sev == 'MINOR' %}
+                  <span class="badge text-bg-info">MINOR</span>
+                {% elif sev == 'NORMAL' %}
+                  <span class="badge text-bg-success">NORMAL</span>
+                {% else %}
+                  <span class="badge text-bg-secondary">{{ row.severity|default:"UNKNOWN" }}</span>
+                {% endif %}
+              {% endwith %}
+            </td>
+            <td>
+              {% with st=row.state|default:''|lower %}
+                {% if st == 'ok' or st == 'success' or st == 'succeeded' %}
+                  <span class="badge text-bg-success">{{ row.state }}</span>
+                {% elif st == 'skipped' %}
+                  <span class="badge text-bg-secondary">{{ row.state }}</span>
+                {% elif 'error' in st or 'fail' in st or 'exception' in st or 'timeout' in st %}
+                  <span class="badge text-bg-danger">{{ row.state }}</span>
+                {% else %}
+                  <span class="badge text-bg-light border">{{ row.state }}</span>
+                {% endif %}
+              {% endwith %}
+            </td>
+            <td>{{ row.last_run }}</td>
+            {% if is_detailed_view %}
+              <td>{{ row.data_source }}</td>
+              <td>{{ row.schedule_cron }}</td>
+              <td>{{ row.last_edited_by }}</td>
+              <td>{{ row.last_edited_at }}</td>
+            {% else %}
+              <td>{{ row.schedule_cron }}</td>
+            {% endif %}
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="{% if is_detailed_view %}13{% else %}8{% endif %}" class="text-center text-muted">No targets found.</td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</form>
+
+<script>
+  (function() {
+    function initTargetsGridActions() {
+      const actionForm = document.getElementById("targets-action-form");
+      if (!actionForm || actionForm.dataset.notesInit === "1") {
+        return;
+      }
+      actionForm.dataset.notesInit = "1";
+
+      const selectedInput = document.getElementById("selected-targets-input");
+      const changeNotesInput = document.getElementById("targets-change-notes-input");
+      const changeNotesModalNode = document.getElementById("targetsChangeNotesModal");
+      const changeNotesField = document.getElementById("targets-change-notes-field");
+      const changeNotesSubmitBtn = document.getElementById("targets-change-notes-submit-btn");
+      const selectedCount = document.getElementById("selected-count");
+      const selectAll = document.getElementById("targets-select-all");
+      const checkboxes = Array.from(document.querySelectorAll(".target-select"));
+      const actionButtons = Array.from(
+        actionForm.querySelectorAll('button[type="submit"][name="action"]')
+      );
+      const actionsWithNotes = new Set([
+        "deactivate_selected",
+        "activate_selected",
+        "unmute_selected",
+        "mute_until_selected",
+      ]);
+      let pendingSubmitter = null;
+      let lastClickedSubmitter = null;
+      let allowSubmit = false;
+
+      function refreshSelection() {
+        if (!selectedInput || !selectedCount) {
+          return;
+        }
+        const names = checkboxes
+          .filter((cb) => cb.checked)
+          .map((cb) => String(cb.value || "").toUpperCase())
+          .filter((item) => Boolean(item));
+        selectedInput.value = JSON.stringify(names);
+        selectedCount.textContent = String(names.length);
+        if (selectAll) {
+          selectAll.checked = checkboxes.length > 0 && names.length === checkboxes.length;
+        }
+      }
+
+      checkboxes.forEach((cb) => cb.addEventListener("change", refreshSelection));
+      if (selectAll) {
+        selectAll.addEventListener("change", function() {
+          checkboxes.forEach((cb) => { cb.checked = selectAll.checked; });
+          refreshSelection();
+        });
+      }
+      actionButtons.forEach((button) => {
+        button.addEventListener("click", function() {
+          lastClickedSubmitter = button;
+        });
+      });
+
+      function shouldRequestChangeNotes(submitter) {
+        if (!submitter) {
+          return false;
+        }
+        const actionValue = String(submitter.value || "").trim();
+        return actionsWithNotes.has(actionValue);
+      }
+
+      if (
+        changeNotesModalNode &&
+        changeNotesField &&
+        changeNotesSubmitBtn &&
+        window.bootstrap &&
+        window.bootstrap.Modal
+      ) {
+        const changeNotesModal = window.bootstrap.Modal.getOrCreateInstance(
+          changeNotesModalNode
+        );
+
+        actionForm.addEventListener("submit", function(event) {
+          const submitter = event.submitter || lastClickedSubmitter || pendingSubmitter;
+          if (allowSubmit) {
+            allowSubmit = false;
+            pendingSubmitter = null;
+            return;
+          }
+          if (!shouldRequestChangeNotes(submitter)) {
+            if (changeNotesInput) {
+              changeNotesInput.value = "";
+            }
+            pendingSubmitter = null;
+            return;
+          }
+          event.preventDefault();
+          pendingSubmitter = submitter || null;
+          changeNotesField.value = changeNotesInput ? String(changeNotesInput.value || "") : "";
+          changeNotesModal.show();
+          window.setTimeout(function() {
+            changeNotesField.focus();
+            changeNotesField.select();
+          }, 100);
+        });
+
+        changeNotesSubmitBtn.addEventListener("click", function() {
+          if (changeNotesInput) {
+            changeNotesInput.value = String(changeNotesField.value || "").trim();
+          }
+          allowSubmit = true;
+          changeNotesModal.hide();
+          if (actionForm.requestSubmit) {
+            if (pendingSubmitter) {
+              actionForm.requestSubmit(pendingSubmitter);
+            } else {
+              actionForm.requestSubmit();
+            }
+            return;
+          }
+          actionForm.submit();
+        });
+
+        changeNotesModalNode.addEventListener("hidden.bs.modal", function() {
+          if (!allowSubmit) {
+            pendingSubmitter = null;
+          }
+        });
+      }
+
+      refreshSelection();
+    }
+
+    if (window.bootstrap && window.bootstrap.Modal) {
+      initTargetsGridActions();
+    } else {
+      document.addEventListener("DOMContentLoaded", initTargetsGridActions, { once: true });
+    }
+  })();
+</script>

@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Help - Audit | ANBU UI{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h1 class="h3 mb-1">Audit Tab Help</h1>
+    <div class="text-muted small">Target configuration versioning and rollback operations.</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{% url 'targets:help' %}">Help Index</a>
+    <a class="btn btn-outline-primary" href="{% url 'targets:help_topic' 'engine' %}">Engine Doc</a>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <h2 class="h5">What Is Stored</h2>
+    <p class="mb-2">
+      Each audited change stores a snapshot of target files and metadata:
+    </p>
+    <ul class="mb-0">
+      <li><code>.env</code> content</li>
+      <li><code>.sql</code> content</li>
+      <li><code>.hql</code> content (when present)</li>
+      <li><code>edited_at</code> and <code>edited_by</code></li>
+    </ul>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <h2 class="h5">Actions in Audit Tab</h2>
+    <ul class="mb-0">
+      <li><strong>View</strong>: opens snapshot content in a separate view with env/sql/hql tabs.</li>
+      <li><strong>View Changes</strong>: shows diff against previous snapshot.</li>
+      <li><strong>Restore</strong>: writes snapshot back to files after confirmation.</li>
+      <li>The latest snapshot's restore is disabled in edit page because it already matches current state.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <h2 class="h5">Restore Semantics</h2>
+    <ul class="mb-0">
+      <li>Restore replaces live target files on disk.</li>
+      <li>Restore itself is audited as a new snapshot for traceability.</li>
+      <li>If <code>.hql</code> in snapshot is empty, current history SQL file is removed.</li>
+      <li>Always verify target behavior after restore using History and latest runtime rows.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <h2 class="h5">Related Docs</h2>
+    <ul class="mb-0">
+      <li><a href="{% url 'targets:help_topic' 'history' %}">History Tab Help</a></li>
+      <li><a href="{% url 'targets:help_topic' 'config' %}">Config Tab Help</a></li>
+      <li><a href="{% url 'targets:help_topic' 'engine' %}">Engine Documentation</a></li>
+    </ul>
+  </div>
+</div>
+{% endblock %}
