@@ -1,0 +1,1009 @@
+{% extends "base.html" %}
+{% block title %}{{ rule.target_name }} | Target{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h1 class="h3 mb-1">{{ rule.target_name }}</h1>
+    <div class="text-muted">{{ rule.description }}</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{% url 'targets:list' %}">Back</a>
+    <a class="btn btn-primary" href="{% url 'targets:edit' rule.target_name %}">Edit Target</a>
+  </div>
+</div>
+
+<ul class="nav nav-tabs mb-0" id="target-detail-tabs" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link active" id="tab-config" data-bs-toggle="tab" data-bs-target="#pane-config" type="button" role="tab" aria-controls="pane-config" aria-selected="true">Config</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="tab-sql" data-bs-toggle="tab" data-bs-target="#pane-sql" type="button" role="tab" aria-controls="pane-sql" aria-selected="false">SQL</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="tab-metrics" data-bs-toggle="tab" data-bs-target="#pane-metrics" type="button" role="tab" aria-controls="pane-metrics" aria-selected="false">Metrics</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="tab-audit" data-bs-toggle="tab" data-bs-target="#pane-audit" type="button" role="tab" aria-controls="pane-audit" aria-selected="false">Audit</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="tab-history" data-bs-toggle="tab" data-bs-target="#pane-history" type="button" role="tab" aria-controls="pane-history" aria-selected="false">History</button>
+  </li>
+  {% if document_url_value %}
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="tab-document" data-bs-toggle="tab" data-bs-target="#pane-document" type="button" role="tab" aria-controls="pane-document" aria-selected="false">Document</button>
+    </li>
+  {% endif %}
+  {% if dashboard_url_value %}
+    <li class="nav-item" role="presentation">
+      <button class="nav-link" id="tab-dashboard" data-bs-toggle="tab" data-bs-target="#pane-dashboard" type="button" role="tab" aria-controls="pane-dashboard" aria-selected="false">Dashboard</button>
+    </li>
+  {% endif %}
+</ul>
+
+<div class="tab-content border border-top-0 rounded-bottom p-3 bg-white" id="target-detail-tab-content">
+  <div class="tab-pane fade show active" id="pane-config" role="tabpanel" aria-labelledby="tab-config">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h2 class="h6 mb-0">Config</h2>
+      <a
+        class="btn btn-outline-secondary btn-sm anbu-help-icon"
+        href="{% url 'targets:help_topic' 'config' %}"
+        target="_blank"
+        rel="noopener noreferrer"
+        title="Config help"
+        aria-label="Config help">?</a>
+    </div>
+    <div class="row g-3">
+      <div class="col-12 col-md-4">
+        <label class="form-label">Target Name</label>
+        <input type="text" class="form-control" value="{{ rule.target_name }}" readonly>
+      </div>
+      <div class="col-6 col-md-2">
+        <div class="form-check mt-4">
+          <input type="checkbox" class="form-check-input" {% if rule.is_active %}checked{% endif %} disabled>
+          <label class="form-check-label">Active</label>
+        </div>
+      </div>
+      <div class="col-6 col-md-2">
+        <div class="form-check mt-4">
+          <input type="checkbox" class="form-check-input" {% if rule.is_muted %}checked{% endif %} disabled>
+          <label class="form-check-label">Muted</label>
+        </div>
+      </div>
+      <div class="col-12">
+        <label class="form-label">Description</label>
+        <textarea class="form-control" rows="2" readonly>{{ rule.description }}</textarea>
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">Document URL</label>
+        <input type="text" class="form-control" value="{{ rule.document_url }}" readonly>
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label">Dashboard URL</label>
+        <input type="text" class="form-control" value="{{ rule.dashboard_url }}" readonly>
+      </div>
+      <div class="col-12 col-md-3">
+        <label class="form-label">Datasource</label>
+        <input type="text" class="form-control" value="{{ rule.data_source }}" readonly>
+      </div>
+      <div class="col-12 col-md-3">
+        <label class="form-label">SQL Mode</label>
+        <input type="text" class="form-control" value="{{ rule.sql_mode }}" readonly>
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label">Timeout(sec)</label>
+        <input type="text" class="form-control" value="{{ rule.sql_timeout_sec }}" readonly>
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label">Jitter(sec)</label>
+        <input type="text" class="form-control" value="{{ rule.sql_jitter_sec }}" readonly>
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">Schedule Cron</label>
+        <input type="text" class="form-control" value="{{ rule.schedule_cron }}" readonly>
+      </div>
+      <div class="col-12">
+        <label class="form-label">Tags</label>
+        <input type="text" class="form-control" value="{{ rule.tag_list }}" readonly>
+      </div>
+    </div>
+
+    <hr>
+    <h2 class="h6">Mute Policies</h2>
+    <div class="row g-3">
+      <div class="col-12 col-md-3">
+        <div class="form-check mt-4">
+          <input type="checkbox" class="form-check-input" {% if rule.mute_between_enabled %}checked{% endif %} disabled>
+          <label class="form-check-label">Mute Between</label>
+        </div>
+      </div>
+      <div class="col-12 col-md-9">
+        {% if rule.mute_between_rules %}
+          <div class="table-responsive table-grid-wrap-sm">
+            <table class="table table-sm table-striped table-bordered align-middle mb-0">
+              <thead class="table-light">
+                <tr>
+                  <th>Start</th>
+                  <th>End</th>
+                  <th>Days</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for item in rule.mute_between_rules %}
+                  <tr>
+                    <td>{{ item.start }}</td>
+                    <td>{{ item.end }}</td>
+                    <td>
+                      {% for day in item.days %}
+                        {{ day }}{% if not forloop.last %}, {% endif %}
+                      {% endfor %}
+                    </td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <div class="alert alert-light border mb-0">No mute between rules.</div>
+        {% endif %}
+      </div>
+
+      <div class="col-12 col-md-3">
+        <div class="form-check mt-4">
+          <input type="checkbox" class="form-check-input" {% if rule.mute_until_enabled %}checked{% endif %} disabled>
+          <label class="form-check-label">Mute Until</label>
+        </div>
+      </div>
+      <div class="col-12 col-md-9">
+        <label class="form-label">Mute Until Datetime</label>
+        <input type="text" class="form-control" value="{{ rule.mute_until }}" readonly>
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-pane fade" id="pane-sql" role="tabpanel" aria-labelledby="tab-sql">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h2 class="h6 mb-0">SQL</h2>
+      <a
+        class="btn btn-outline-secondary btn-sm anbu-help-icon"
+        href="{% url 'targets:help_topic' 'sql' %}"
+        target="_blank"
+        rel="noopener noreferrer"
+        title="SQL help"
+        aria-label="SQL help">?</a>
+    </div>
+    <textarea id="target-sql-hidden" class="d-none">{{ sql_text }}</textarea>
+    <div id="target-sql-editor" class="ace-box mb-3"></div>
+    <div class="alert alert-light border small">
+      Single-line SQL must return one row. Multiline SQL must return one row per metric. Only read-only SQL is allowed.
+    </div>
+
+    <h2 class="h6">Mappings</h2>
+    <div class="table-responsive table-grid-wrap-sm">
+      <table class="table table-sm table-striped table-bordered align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Value</th>
+            <th>Alias</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for key, value in rule.mapping.items %}
+            <tr>
+              <td>{{ key }}</td>
+              <td>{{ value|default:"-" }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="tab-pane fade" id="pane-metrics" role="tabpanel" aria-labelledby="tab-metrics">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h2 class="h6 mb-0">Metrics</h2>
+      <a
+        class="btn btn-outline-secondary btn-sm anbu-help-icon"
+        href="{% url 'targets:help_topic' 'metrics' %}"
+        target="_blank"
+        rel="noopener noreferrer"
+        title="Metrics help"
+        aria-label="Metrics help">?</a>
+    </div>
+    {% if rule.metrics %}
+      <div class="d-flex flex-column gap-3">
+        {% for metric in rule.metrics %}
+          <details class="border rounded p-2" {% if forloop.first %}open{% endif %}>
+            <summary class="fw-semibold">
+              Metric {{ forloop.counter }}{% if metric.NAME %} - {{ metric.NAME }}{% endif %}
+            </summary>
+            <div class="pt-3">
+              <div class="row g-2">
+                <div class="col-12 col-md-6">
+                  <label class="form-label">Name</label>
+                  <input type="text" class="form-control form-control-sm" value="{{ metric.NAME }}" readonly>
+                </div>
+                <div class="col-12 col-md-6">
+                  <label class="form-label">Value</label>
+                  <input type="text" class="form-control form-control-sm" value="{{ metric.VALUE }}" readonly>
+                </div>
+                <div class="col-12 col-md-4">
+                  <label class="form-label">Normal Action</label>
+                  <input type="text" class="form-control form-control-sm" value="{{ metric.NORMAL_ACTION }}" readonly>
+                </div>
+                <div class="col-12 col-md-8">
+                  <label class="form-label">Normal Msg</label>
+                  <input type="text" class="form-control form-control-sm" value="{{ metric.NORMAL_MSG }}" readonly>
+                </div>
+              </div>
+
+              <div class="mt-3">
+                <h3 class="h6 mb-2">Critical</h3>
+                {% if metric.CRITICAL %}
+                  <div class="table-responsive table-grid-wrap-sm">
+                    <table class="table table-sm table-striped table-bordered align-middle mb-0">
+                      <thead class="table-light">
+                        <tr>
+                          <th>Op</th>
+                          <th>Val</th>
+                          <th>Action</th>
+                          <th>Msg</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for condition in metric.CRITICAL %}
+                          <tr>
+                            <td>{{ condition.OPERATOR }}</td>
+                            <td>{{ condition.VAL }}</td>
+                            <td>{{ condition.ACTION }}</td>
+                            <td>{{ condition.MSG }}</td>
+                          </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </div>
+                {% else %}
+                  <div class="alert alert-light border mb-0">No critical conditions.</div>
+                {% endif %}
+              </div>
+
+              <div class="mt-3">
+                <h3 class="h6 mb-2">Major</h3>
+                {% if metric.MAJOR %}
+                  <div class="table-responsive table-grid-wrap-sm">
+                    <table class="table table-sm table-striped table-bordered align-middle mb-0">
+                      <thead class="table-light">
+                        <tr>
+                          <th>Op</th>
+                          <th>Val</th>
+                          <th>Action</th>
+                          <th>Msg</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for condition in metric.MAJOR %}
+                          <tr>
+                            <td>{{ condition.OPERATOR }}</td>
+                            <td>{{ condition.VAL }}</td>
+                            <td>{{ condition.ACTION }}</td>
+                            <td>{{ condition.MSG }}</td>
+                          </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </div>
+                {% else %}
+                  <div class="alert alert-light border mb-0">No major conditions.</div>
+                {% endif %}
+              </div>
+
+              <div class="mt-3">
+                <h3 class="h6 mb-2">Minor</h3>
+                {% if metric.MINOR %}
+                  <div class="table-responsive table-grid-wrap-sm">
+                    <table class="table table-sm table-striped table-bordered align-middle mb-0">
+                      <thead class="table-light">
+                        <tr>
+                          <th>Op</th>
+                          <th>Val</th>
+                          <th>Action</th>
+                          <th>Msg</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {% for condition in metric.MINOR %}
+                          <tr>
+                            <td>{{ condition.OPERATOR }}</td>
+                            <td>{{ condition.VAL }}</td>
+                            <td>{{ condition.ACTION }}</td>
+                            <td>{{ condition.MSG }}</td>
+                          </tr>
+                        {% endfor %}
+                      </tbody>
+                    </table>
+                  </div>
+                {% else %}
+                  <div class="alert alert-light border mb-0">No minor conditions.</div>
+                {% endif %}
+              </div>
+            </div>
+          </details>
+        {% endfor %}
+      </div>
+    {% else %}
+      <div class="alert alert-light border mb-0">No metrics defined.</div>
+    {% endif %}
+  </div>
+
+  <div class="tab-pane fade" id="pane-audit" role="tabpanel" aria-labelledby="tab-audit">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h2 class="h6 mb-0">Audit History</h2>
+      <a
+        class="btn btn-outline-secondary btn-sm anbu-help-icon"
+        href="{% url 'targets:help_topic' 'audit' %}"
+        target="_blank"
+        rel="noopener noreferrer"
+        title="Audit help"
+        aria-label="Audit help">?</a>
+    </div>
+    {% if audit_rows %}
+      <div class="table-responsive table-grid-wrap-md">
+        <table class="table table-sm table-striped table-bordered align-middle mb-0">
+          <thead class="table-light sticky-top">
+            <tr>
+              <th>Last Edited At</th>
+              <th>Last Edited By</th>
+              <th>Change Notes</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in audit_rows %}
+              <tr>
+                <td>{{ row.last_edited_at }}</td>
+                <td>{{ row.last_edited_by }}</td>
+                <td class="text-break">{{ row.change_notes }}</td>
+                <td class="text-nowrap">
+                  <div class="d-flex gap-2">
+                    <a class="btn btn-outline-secondary btn-sm" href="{{ row.view_url }}" target="_blank" rel="noopener noreferrer">View</a>
+                    <a class="btn btn-outline-secondary btn-sm" href="{{ row.changes_url }}" target="_blank" rel="noopener noreferrer">View Changes</a>
+                    <button
+                      type="button"
+                      class="btn btn-outline-danger btn-sm audit-restore-btn"
+                      data-restore-url="{{ row.restore_url }}">Restore</button>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="alert alert-light border mb-0">No audit records found.</div>
+    {% endif %}
+  </div>
+
+  <div class="tab-pane fade" id="pane-history" role="tabpanel" aria-labelledby="tab-history">
+    <div class="d-flex justify-content-between align-items-center mb-3">
+      <h2 class="h6 mb-0">Status History</h2>
+      <a
+        class="btn btn-outline-secondary btn-sm anbu-help-icon"
+        href="{% url 'targets:help_topic' 'history' %}"
+        target="_blank"
+        rel="noopener noreferrer"
+        title="History help"
+        aria-label="History help">?</a>
+    </div>
+    {% if postgres_error %}
+      <div class="alert alert-warning">data_store error: {{ postgres_error }}</div>
+    {% endif %}
+
+    <div class="row g-2 mb-3 align-items-end">
+      <div class="col-12 col-md-4">
+        <label class="form-label" for="history-metric-filter">Metric</label>
+        <select id="history-metric-filter" class="form-select form-select-sm">
+          <option value="" {% if not selected_metric %}selected{% endif %}>All metrics</option>
+          {% for metric in history_metrics %}
+            <option value="{{ metric }}" {% if selected_metric == metric %}selected{% endif %}>{{ metric }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-12 col-md-8">
+        <div class="d-flex flex-wrap justify-content-md-end gap-2">
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="history-view-raw-btn">View Raw Instance</button>
+          <button type="button" class="btn btn-outline-danger btn-sm" id="history-delete-btn">Delete History</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="history-refresh-btn">Refresh</button>
+          <button type="button" class="btn btn-success btn-sm" id="history-run-normal-btn">Run Normal Action</button>
+          <button type="button" class="btn btn-primary btn-sm" id="history-import-btn">Import History</button>
+        </div>
+      </div>
+    </div>
+
+    {% if history_rows %}
+      <div class="table-responsive table-grid-wrap-md mb-3">
+        <table class="table table-sm table-striped table-bordered align-middle mb-0">
+          <thead class="table-light sticky-top">
+            <tr>
+              <th>Metric</th>
+              <th>Severity</th>
+              <th>State</th>
+              <th>Started At</th>
+              <th>Ended At</th>
+              <th>Message</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in history_rows %}
+              <tr>
+                <td>{{ row.metric_name }}</td>
+                <td>{{ row.severity }}</td>
+                <td>{{ row.state }}</td>
+                <td>{{ row.started_at }}</td>
+                <td>{{ row.ended_at }}</td>
+                <td>{{ row.last_message }}</td>
+                <td>{{ row.last_action }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <div class="alert alert-light border mb-0">No history found.</div>
+    {% endif %}
+  </div>
+
+  {% if document_url_value %}
+    <div class="tab-pane fade" id="pane-document" role="tabpanel" aria-labelledby="tab-document">
+      <h2 class="h6">Document</h2>
+      <iframe src="{{ document_url_value }}" class="w-100 border rounded mb-2" style="min-height: 800px;" loading="lazy"></iframe>
+      <a href="{{ document_url_value }}" target="_blank" rel="noopener noreferrer">{{ document_url_value }}</a>
+    </div>
+  {% endif %}
+
+  {% if dashboard_url_value %}
+    <div class="tab-pane fade" id="pane-dashboard" role="tabpanel" aria-labelledby="tab-dashboard">
+      <h2 class="h6">Dashboard</h2>
+      <iframe src="{{ dashboard_url_value }}" class="w-100 border rounded mb-2" style="min-height: 800px;" loading="lazy"></iframe>
+      <a href="{{ dashboard_url_value }}" target="_blank" rel="noopener noreferrer">{{ dashboard_url_value }}</a>
+    </div>
+  {% endif %}
+</div>
+
+<div class="modal fade" id="historyRawModal" tabindex="-1" aria-labelledby="historyRawModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-xl modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title fs-5" id="historyRawModalLabel">Raw Instances</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body" id="history-raw-body">
+        <div class="text-muted small">Raw instances are loaded on demand.</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="historyDeleteModal" tabindex="-1" aria-labelledby="historyDeleteModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title fs-5" id="historyDeleteModalLabel">Delete History</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="mb-2">Delete all history records for this target?</p>
+        <div class="small" id="history-delete-feedback"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-danger btn-sm" id="history-delete-confirm-btn">Delete</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="historyImportModal" tabindex="-1" aria-labelledby="historyImportModalLabel" aria-hidden="true">
+  <div class="modal-dialog modal-lg modal-dialog-scrollable">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title fs-5" id="historyImportModalLabel">Import History</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted small mb-2">
+          SQL must return: <code>dttm</code>, <code>metric_name</code>, <code>value</code>.
+        </p>
+        <textarea id="history-import-sql-hidden" class="d-none">{{ history_import_sql }}</textarea>
+        <div id="history-import-sql-editor" class="ace-box" style="min-height: 320px;"></div>
+        <div class="small mt-2" id="history-import-feedback"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+        <button type="button" class="btn btn-primary btn-sm" id="history-import-run-btn">Import</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal fade" id="historyRunNormalModal" tabindex="-1" aria-labelledby="historyRunNormalModalLabel" aria-hidden="true">
+  <div class="modal-dialog">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title fs-5" id="historyRunNormalModalLabel">Run Normal Actions</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <p class="text-muted small mb-2">
+          Runs configured normal actions using current metric values with severity <code>1</code>.
+          If Metric is <strong>All metrics</strong>, all non-normal metrics are processed from their latest execution.
+        </p>
+        <label class="form-label" for="history-run-normal-message">Message</label>
+        <textarea id="history-run-normal-message" class="form-control" rows="3"></textarea>
+        <div id="history-run-normal-progress-wrap" class="d-none mt-3" aria-live="polite" aria-busy="true">
+          <div class="small text-muted mb-1">Running actions...</div>
+          <div class="progress">
+            <div
+              class="progress-bar bg-success progress-bar-striped progress-bar-animated"
+              role="progressbar"
+              aria-valuenow="100"
+              aria-valuemin="0"
+              aria-valuemax="100"
+              style="width: 75%;"></div>
+          </div>
+        </div>
+        <label class="form-label mt-3" for="history-run-normal-output">Execution Output</label>
+        <textarea id="history-run-normal-output" class="form-control font-monospace" rows="10" readonly></textarea>
+        <div class="small mt-2" id="history-run-normal-feedback"></div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" class="btn btn-success btn-sm" id="history-run-normal-confirm-btn">Run</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function() {
+    window.ANBU.initAceReadOnly("target-sql-editor", "target-sql-hidden");
+
+    const tabStorageKey = "anbu_target_detail_active_tab";
+    const savedTab = localStorage.getItem(tabStorageKey);
+    if (savedTab) {
+      const trigger = document.querySelector('#target-detail-tabs button[data-bs-target="' + savedTab + '"]');
+      if (trigger) {
+        bootstrap.Tab.getOrCreateInstance(trigger).show();
+      }
+    }
+    const tabTriggers = document.querySelectorAll("#target-detail-tabs button[data-bs-toggle='tab']");
+    tabTriggers.forEach((tab) => {
+      tab.addEventListener("shown.bs.tab", function(event) {
+        const target = event.target.getAttribute("data-bs-target");
+        if (target) {
+          localStorage.setItem(tabStorageKey, target);
+        }
+      });
+    });
+
+    const metricFilter = document.getElementById("history-metric-filter");
+    if (metricFilter) {
+      metricFilter.addEventListener("change", function() {
+        const url = new URL(window.location.href);
+        const value = String(metricFilter.value || "").trim();
+        if (value) {
+          url.searchParams.set("metric_name", value);
+        } else {
+          url.searchParams.delete("metric_name");
+        }
+        window.location.href = url.toString();
+      });
+    }
+
+    const historyInstancesUrl = "{% url 'targets:history_instances' rule.target_name %}";
+    const historyDeleteUrl = "{% url 'targets:history_delete' rule.target_name %}";
+    const historyImportUrl = "{% url 'targets:history_import' rule.target_name %}";
+    const historyRunNormalUrl = "{% url 'targets:history_run_normal_actions' rule.target_name %}";
+
+    function getCsrfToken() {
+      const cookieParts = document.cookie ? document.cookie.split(";") : [];
+      for (let i = 0; i < cookieParts.length; i += 1) {
+        const value = cookieParts[i].trim();
+        if (value.startsWith("csrftoken=")) {
+          return decodeURIComponent(value.slice("csrftoken=".length));
+        }
+      }
+      return "";
+    }
+
+    function setFeedback(node, kind, message, errors) {
+      if (!node) {
+        return;
+      }
+      node.className = "small mt-2";
+      if (!message) {
+        node.textContent = "";
+        return;
+      }
+      if (kind === "danger") {
+        node.classList.add("text-danger");
+      } else if (kind === "success") {
+        node.classList.add("text-success");
+      } else {
+        node.classList.add("text-muted");
+      }
+      if (Array.isArray(errors) && errors.length) {
+        node.textContent = message + " " + errors.join(" | ");
+      } else {
+        node.textContent = message;
+      }
+    }
+
+    function getSelectedHistoryMetricFromDropdown() {
+      if (!metricFilter) {
+        return "";
+      }
+      return String(metricFilter.value || "").trim().toUpperCase();
+    }
+
+    function renderRawRows(rows, container) {
+      if (!container) {
+        return;
+      }
+      container.innerHTML = "";
+      if (!Array.isArray(rows) || rows.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "alert alert-light border mb-0";
+        empty.textContent = "No records found.";
+        container.appendChild(empty);
+        return;
+      }
+      const headers = Object.keys(rows[0]);
+      const wrapper = document.createElement("div");
+      wrapper.className = "table-responsive table-grid-wrap-lg";
+      const table = document.createElement("table");
+      table.className = "table table-sm table-striped table-bordered align-middle mb-0";
+      const thead = document.createElement("thead");
+      thead.className = "table-light sticky-top";
+      const headerRow = document.createElement("tr");
+      headers.forEach((key) => {
+        const th = document.createElement("th");
+        th.textContent = key;
+        headerRow.appendChild(th);
+      });
+      thead.appendChild(headerRow);
+      table.appendChild(thead);
+
+      const tbody = document.createElement("tbody");
+      rows.forEach((row) => {
+        const tr = document.createElement("tr");
+        headers.forEach((key) => {
+          const td = document.createElement("td");
+          const value = row[key];
+          td.textContent = value === null || value === undefined ? "" : String(value);
+          tr.appendChild(td);
+        });
+        tbody.appendChild(tr);
+      });
+      table.appendChild(tbody);
+      wrapper.appendChild(table);
+      container.appendChild(wrapper);
+    }
+
+    const refreshBtn = document.getElementById("history-refresh-btn");
+    if (refreshBtn) {
+      refreshBtn.addEventListener("click", function() {
+        window.location.reload();
+      });
+    }
+
+    const rawModalNode = document.getElementById("historyRawModal");
+    const rawBody = document.getElementById("history-raw-body");
+    const viewRawBtn = document.getElementById("history-view-raw-btn");
+    if (rawModalNode && viewRawBtn) {
+      const rawModal = bootstrap.Modal.getOrCreateInstance(rawModalNode);
+      viewRawBtn.addEventListener("click", async function() {
+        rawModal.show();
+        if (rawBody) {
+          rawBody.innerHTML = '<div class="text-muted">Loading raw instances...</div>';
+        }
+        try {
+          const response = await fetch(historyInstancesUrl, {
+            method: "GET",
+            headers: { "X-Requested-With": "XMLHttpRequest" },
+          });
+          const payload = await response.json();
+          if (!response.ok || !payload.ok) {
+            const message = payload && payload.error ? payload.error : "Failed to load raw instances.";
+            throw new Error(message);
+          }
+          renderRawRows(payload.rows || [], rawBody);
+        } catch (error) {
+          if (rawBody) {
+            rawBody.innerHTML = '<div class="alert alert-danger mb-0"></div>';
+            const alertNode = rawBody.querySelector(".alert");
+            if (alertNode) {
+              alertNode.textContent = error && error.message ? error.message : "Failed to load raw instances.";
+            }
+          }
+        }
+      });
+    }
+
+    const deleteModalNode = document.getElementById("historyDeleteModal");
+    const deleteFeedback = document.getElementById("history-delete-feedback");
+    const deleteBtn = document.getElementById("history-delete-btn");
+    const deleteConfirmBtn = document.getElementById("history-delete-confirm-btn");
+    if (deleteModalNode && deleteBtn && deleteConfirmBtn) {
+      const deleteModal = bootstrap.Modal.getOrCreateInstance(deleteModalNode);
+      deleteBtn.addEventListener("click", function() {
+        setFeedback(deleteFeedback, "muted", "", []);
+        deleteModal.show();
+      });
+      deleteConfirmBtn.addEventListener("click", async function() {
+        deleteConfirmBtn.disabled = true;
+        setFeedback(deleteFeedback, "muted", "Deleting...", []);
+        try {
+          const response = await fetch(historyDeleteUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+              "X-CSRFToken": getCsrfToken(),
+              "X-Requested-With": "XMLHttpRequest",
+            },
+            body: new URLSearchParams(),
+          });
+          const payload = await response.json();
+          if (!response.ok || !payload.ok) {
+            const message = payload && payload.error ? payload.error : "Delete failed.";
+            throw new Error(message);
+          }
+          setFeedback(
+            deleteFeedback,
+            "success",
+            "Deleted " + String(payload.deleted || 0) + " records.",
+            []
+          );
+          window.setTimeout(function() {
+            window.location.reload();
+          }, 600);
+        } catch (error) {
+          setFeedback(
+            deleteFeedback,
+            "danger",
+            error && error.message ? error.message : "Delete failed.",
+            []
+          );
+          deleteConfirmBtn.disabled = false;
+        }
+      });
+    }
+
+    let historyImportEditor = null;
+    const importModalNode = document.getElementById("historyImportModal");
+    const importBtn = document.getElementById("history-import-btn");
+    const importRunBtn = document.getElementById("history-import-run-btn");
+    const importFeedback = document.getElementById("history-import-feedback");
+    const importSqlHidden = document.getElementById("history-import-sql-hidden");
+    const importSqlEditorNode = document.getElementById("history-import-sql-editor");
+
+    function ensureImportEditor() {
+      if (historyImportEditor || !importSqlEditorNode) {
+        return;
+      }
+      const initialSql = importSqlHidden ? importSqlHidden.value : "";
+      historyImportEditor = window.ANBU.initAce("history-import-sql-editor", initialSql, {
+        mode: "ace/mode/sql",
+        theme: "ace/theme/github",
+        readOnly: false,
+      });
+    }
+
+    if (importModalNode && importBtn) {
+      const importModal = bootstrap.Modal.getOrCreateInstance(importModalNode);
+      importBtn.addEventListener("click", function() {
+        setFeedback(importFeedback, "muted", "", []);
+        importModal.show();
+      });
+      importModalNode.addEventListener("shown.bs.modal", function() {
+        ensureImportEditor();
+      });
+      if (importRunBtn) {
+        importRunBtn.addEventListener("click", async function() {
+          ensureImportEditor();
+          importRunBtn.disabled = true;
+          setFeedback(importFeedback, "muted", "Importing...", []);
+          const sql = historyImportEditor ? historyImportEditor.getValue() : (importSqlHidden ? importSqlHidden.value : "");
+          try {
+            const response = await fetch(historyImportUrl, {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+                "X-CSRFToken": getCsrfToken(),
+                "X-Requested-With": "XMLHttpRequest",
+              },
+              body: new URLSearchParams({ sql: sql || "" }),
+            });
+            const payload = await response.json();
+            if (!response.ok || !payload.ok) {
+              const message = payload && payload.error ? payload.error : "Import failed.";
+              const errors = payload && Array.isArray(payload.errors) ? payload.errors : [];
+              setFeedback(importFeedback, "danger", message, errors);
+              importRunBtn.disabled = false;
+              return;
+            }
+            setFeedback(
+              importFeedback,
+              "success",
+              "Import successful. Inserted " + String(payload.inserted || 0) + " rows.",
+              []
+            );
+            window.setTimeout(function() {
+              window.location.reload();
+            }, 700);
+          } catch (error) {
+            setFeedback(
+              importFeedback,
+              "danger",
+              error && error.message ? error.message : "Import failed.",
+              []
+            );
+            importRunBtn.disabled = false;
+          }
+        });
+      }
+    }
+
+    const runNormalBtn = document.getElementById("history-run-normal-btn");
+    const runNormalModalNode = document.getElementById("historyRunNormalModal");
+    const runNormalConfirmBtn = document.getElementById("history-run-normal-confirm-btn");
+    const runNormalMessageInput = document.getElementById("history-run-normal-message");
+    const runNormalFeedback = document.getElementById("history-run-normal-feedback");
+    const runNormalProgressWrap = document.getElementById("history-run-normal-progress-wrap");
+    const runNormalOutput = document.getElementById("history-run-normal-output");
+
+    function buildRunNormalOutput(payload) {
+      const directOutput = payload && typeof payload.output_text === "string"
+        ? payload.output_text
+        : "";
+      if (directOutput.trim()) {
+        return directOutput;
+      }
+      const results = payload && Array.isArray(payload.results) ? payload.results : [];
+      const chunks = [];
+      results.forEach((result) => {
+        const lines = [
+          "Metric: " + String(result && result.metric_name ? result.metric_name : ""),
+          "Status: " + String(result && result.status ? result.status : ""),
+        ];
+        if (result && result.exit_status !== undefined && result.exit_status !== null) {
+          lines.push("Exit: " + String(result.exit_status));
+        }
+        if (result && result.detail) {
+          lines.push("Detail: " + String(result.detail));
+        }
+        if (result && result.stdout) {
+          lines.push("STDOUT:");
+          lines.push(String(result.stdout));
+        }
+        if (result && result.stderr) {
+          lines.push("STDERR:");
+          lines.push(String(result.stderr));
+        }
+        chunks.push(lines.join("\n"));
+      });
+      return chunks.join("\n\n---\n\n");
+    }
+
+    if (runNormalBtn && runNormalModalNode && runNormalConfirmBtn) {
+      const runNormalModal = bootstrap.Modal.getOrCreateInstance(runNormalModalNode);
+      runNormalBtn.addEventListener("click", function() {
+        setFeedback(runNormalFeedback, "muted", "", []);
+        if (runNormalMessageInput) {
+          runNormalMessageInput.value = "";
+        }
+        if (runNormalOutput) {
+          runNormalOutput.value = "";
+        }
+        if (runNormalProgressWrap) {
+          runNormalProgressWrap.classList.add("d-none");
+        }
+        runNormalModal.show();
+      });
+
+      runNormalConfirmBtn.addEventListener("click", async function() {
+        const selectedMetric = getSelectedHistoryMetricFromDropdown();
+        const metricSelection = selectedMetric ? [selectedMetric] : ["ALL"];
+        const messageText = runNormalMessageInput ? String(runNormalMessageInput.value || "").trim() : "";
+        runNormalConfirmBtn.disabled = true;
+        setFeedback(runNormalFeedback, "muted", "Running...", []);
+        if (runNormalOutput) {
+          runNormalOutput.value = "";
+        }
+        if (runNormalProgressWrap) {
+          runNormalProgressWrap.classList.remove("d-none");
+        }
+        try {
+          const response = await fetch(historyRunNormalUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+              "X-CSRFToken": getCsrfToken(),
+              "X-Requested-With": "XMLHttpRequest",
+            },
+            body: new URLSearchParams({
+              metrics: JSON.stringify(metricSelection),
+              message: messageText,
+            }),
+          });
+          const payload = await response.json();
+          if (!response.ok || !payload.ok) {
+            const message = payload && payload.error ? payload.error : "Run normal actions failed.";
+            throw new Error(message);
+          }
+          const summary = payload.summary || {};
+          const summaryText =
+            "Requested: " + String(summary.requested || 0) +
+            ", Executed: " + String(summary.executed || 0) +
+            ", Success: " + String(summary.success || 0) +
+            ", Failed: " + String(summary.failed || 0) +
+            ", Skipped: " + String(summary.skipped || 0);
+          const kind = Number(summary.failed || 0) > 0 ? "danger" : "success";
+          setFeedback(runNormalFeedback, kind, summaryText, []);
+          if (runNormalOutput) {
+            runNormalOutput.value = buildRunNormalOutput(payload);
+          }
+        } catch (error) {
+          setFeedback(
+            runNormalFeedback,
+            "danger",
+            error && error.message ? error.message : "Run normal actions failed.",
+            []
+          );
+        } finally {
+          runNormalConfirmBtn.disabled = false;
+          if (runNormalProgressWrap) {
+            runNormalProgressWrap.classList.add("d-none");
+          }
+        }
+      });
+    }
+
+    const restoreButtons = document.querySelectorAll(".audit-restore-btn");
+    restoreButtons.forEach((button) => {
+      button.addEventListener("click", async function() {
+        const restoreUrl = String(button.getAttribute("data-restore-url") || "").trim();
+        if (!restoreUrl) {
+          return;
+        }
+        if (!window.confirm("are you sure")) {
+          return;
+        }
+        button.disabled = true;
+        try {
+          const response = await fetch(restoreUrl, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+              "X-CSRFToken": getCsrfToken(),
+              "X-Requested-With": "XMLHttpRequest",
+            },
+            body: new URLSearchParams(),
+          });
+          const payload = await response.json();
+          if (!response.ok || !payload.ok) {
+            const message = payload && payload.error ? payload.error : "Restore failed.";
+            throw new Error(message);
+          }
+          window.alert("Restore completed.");
+          window.location.reload();
+        } catch (error) {
+          button.disabled = false;
+          window.alert(error && error.message ? error.message : "Restore failed.");
+        }
+      });
+    });
+  })();
+</script>
+{% endblock %}

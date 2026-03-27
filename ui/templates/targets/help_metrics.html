@@ -1,0 +1,122 @@
+{% extends "base.html" %}
+{% block title %}Help - Metrics | ANBU UI{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h1 class="h3 mb-1">Metrics Tab Help</h1>
+    <div class="text-muted small">Condition model, severity evaluation, defaults, and multiline override rules.</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{% url 'targets:help' %}">Help Index</a>
+    <a class="btn btn-outline-primary" href="{% url 'targets:help_topic' 'engine' %}">Engine Doc</a>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <h2 class="h5">Metric Object Model</h2>
+    <p class="mb-2">Each metric definition contains these core fields:</p>
+    <ul class="mb-0">
+      <li><code>NAME</code>: metric identifier. In multiline mode, this is matched against SQL row metric name.</li>
+      <li><code>VALUE</code>: source reference used as main numeric value (<code>VALn</code> or alias).</li>
+      <li><code>NORMAL_ACTION</code> + <code>NORMAL_MSG</code>: default path when no severity condition matches.</li>
+      <li><code>CRITICAL</code>/<code>MAJOR</code>/<code>MINOR</code> condition arrays.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <h2 class="h5">Usable Default Parameters in Formulas and Messages</h2>
+    <p class="mb-2">
+      Runtime builds a context before evaluating conditions and rendering messages.
+    </p>
+    <div class="table-responsive">
+      <table class="table table-sm table-bordered align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Parameter</th>
+            <th>Meaning</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><code>VAL1..VAL10</code></td><td>Raw SQL columns.</td></tr>
+          <tr><td>Mapped aliases</td><td>Friendly names from SQL mapping tab.</td></tr>
+          <tr><td><code>TARGET_NAME</code></td><td>Current target key.</td></tr>
+          <tr><td><code>METRIC_NAME</code></td><td>Current metric being evaluated.</td></tr>
+          <tr><td><code>BASELINE</code></td><td>Median baseline from historical samples.</td></tr>
+          <tr><td><code>DEVIATION</code></td><td>Median absolute deviation (MAD).</td></tr>
+          <tr><td><code>CONDITION_VALUE</code></td><td>Matched threshold expression result.</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="mt-3 mb-0">
+      Message templates support placeholders such as <code>&#123;&#123;METRIC_NAME&#125;&#125;</code>,
+      <code>&#123;&#123;BASELINE&#125;&#125;</code>,
+      <code>&#123;&#123;DEVIATION&#125;&#125;</code>,
+      <code>&#123;&#123;CONDITION_VALUE&#125;&#125;</code>, and mapped aliases.
+    </p>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <h2 class="h5">How Evaluation Works</h2>
+    <ol class="mb-0">
+      <li>Resolve <code>VALUE</code> reference to metric numeric value.</li>
+      <li>Calculate <code>BASELINE</code>/<code>DEVIATION</code> from historical results (same metric, day-of-week, and time window).</li>
+      <li>Evaluate conditions in strict severity order: <code>CRITICAL</code> then <code>MAJOR</code> then <code>MINOR</code>.</li>
+      <li>Inside each severity, evaluate condition rows by ascending index; first true condition wins.</li>
+      <li>If no condition matches, severity becomes NORMAL and normal action/message are used.</li>
+      <li>Severity number mapping: NORMAL=1, MINOR=2, MAJOR=3, CRITICAL=4.</li>
+      <li>Final state may still be <code>action_error</code>, <code>config_error</code>, or <code>data_error</code> depending on action/data issues.</li>
+    </ol>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <h2 class="h5">Expressions and Operators</h2>
+    <ul class="mb-0">
+      <li>Supported operators: <code>=</code>, <code>&lt;</code>, <code>&gt;</code>, <code>=&lt;</code>, <code>=&gt;</code>.</li>
+      <li>Condition value expressions support arithmetic and safe functions: <code>max/min/greatest/least</code>.</li>
+      <li>Expressions must evaluate to numeric values; unknown identifiers fail validation/runtime.</li>
+      <li>Legacy <code>METRIC_n_SEVERITY_IF</code> exists for backward compatibility, but structured condition arrays are preferred.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <h2 class="h5">Single vs Multiline Metric Strategy</h2>
+    <h3 class="h6 mt-2">Single Mode</h3>
+    <p class="mb-2">
+      One SQL row is shared by all configured metrics. Use this when one snapshot row provides all values.
+    </p>
+    <h3 class="h6">Multiline Mode</h3>
+    <p class="mb-2">
+      SQL returns one row per metric; runtime routes each row by first-column metric name.
+    </p>
+    <p class="mb-2">
+      To override behavior for a specific multiline metric, define a metric object whose <code>NAME</code>
+      exactly matches that row's metric name (case-insensitive match).
+    </p>
+    <p class="mb-0">
+      For catch-all behavior, define a metric named <code>DEFAULT</code>. Runtime applies it to rows that do not match a specific metric definition.
+      This is the recommended way to combine specific overrides with generic fallback logic.
+    </p>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <h2 class="h5">Related Docs</h2>
+    <ul class="mb-0">
+      <li><a href="{% url 'targets:help_topic' 'ai-migration' %}">AI-Assisted Alarm Migration</a></li>
+      <li><a href="{% url 'targets:help_topic' 'sql' %}">SQL Tab Help</a></li>
+      <li><a href="{% url 'targets:help_topic' 'config' %}">Config Tab Help</a></li>
+      <li><a href="{% url 'targets:help_topic' 'engine' %}">Engine Documentation</a></li>
+    </ul>
+  </div>
+</div>
+{% endblock %}

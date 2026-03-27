@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+{% block title %}Help - History | ANBU UI{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h1 class="h3 mb-1">History Tab Help</h1>
+    <div class="text-muted small">Runtime intervals, raw execution records, import, and replay actions.</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{% url 'targets:help' %}">Help Index</a>
+    <a class="btn btn-outline-primary" href="{% url 'targets:help_topic' 'engine' %}">Engine Doc</a>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <h2 class="h5">Status History Table</h2>
+    <p class="mb-2">
+      The history table shows contiguous severity/state intervals per metric, not individual raw execution rows.
+      Runtime rows are grouped when severity or state does not change.
+    </p>
+    <ul class="mb-0">
+      <li><code>started_at</code>: first row in interval.</li>
+      <li><code>ended_at</code>: last row in interval (current active interval has no end time).</li>
+      <li><code>last_message</code>, <code>last_action</code>: latest values in that interval.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <h2 class="h5">Metric Filter</h2>
+    <ul class="mb-0">
+      <li>Dropdown filters interval view by metric name.</li>
+      <li><strong>All metrics</strong> shows all intervals for the target.</li>
+      <li>Filter selection also drives behavior in <strong>Run Normal Action</strong> popup.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <h2 class="h5">History Actions</h2>
+    <ul class="mb-0">
+      <li><strong>View Raw Instance</strong>: loads raw <code>anbu_result</code> rows on demand (up to limit).</li>
+      <li><strong>Delete History</strong>: removes all runtime rows for the target.</li>
+      <li><strong>Import History</strong>: executes read-only history SQL (<code>.hql</code>) and inserts rows into runtime table.</li>
+      <li><strong>Refresh</strong>: reloads latest intervals and states.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <h2 class="h5">Run Normal Action</h2>
+    <ul class="mb-0">
+      <li>Uses selected metric from dropdown. If dropdown is <strong>All metrics</strong>, it processes all configured metrics.</li>
+      <li>Only metrics whose latest severity is not NORMAL are executed.</li>
+      <li>Normal action script is called with severity forced to <code>1</code> and the provided message.</li>
+      <li>Popup shows progress bar while request runs and outputs combined stdout/stderr per metric.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <h2 class="h5">Related Docs</h2>
+    <ul class="mb-0">
+      <li><a href="{% url 'targets:help_topic' 'metrics' %}">Metrics Tab Help</a></li>
+      <li><a href="{% url 'targets:help_topic' 'audit' %}">Audit Tab Help</a></li>
+      <li><a href="{% url 'targets:help_topic' 'engine' %}">Engine Documentation</a></li>
+    </ul>
+  </div>
+</div>
+{% endblock %}

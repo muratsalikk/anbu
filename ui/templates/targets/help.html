@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}Help | ANBU UI{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h1 class="h3 mb-1">ANBU Alarm Management Help</h1>
+    <div class="text-muted small">Documentation index and deep links for operators and maintainers.</div>
+  </div>
+  <a class="btn btn-outline-secondary" href="{% url 'targets:list' %}">Back to Targets</a>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <h2 class="h5 mb-3">Planning Guides</h2>
+    <div class="table-responsive mb-3">
+      <table class="table table-sm table-bordered align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Guide</th>
+            <th>Focus</th>
+            <th>Open</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Alarm Planning</td>
+            <td>How to plan target/metric alarm scenarios, monitor-only metrics, and false-positive tuning strategy.</td>
+            <td><a class="btn btn-outline-primary btn-sm" href="{% url 'targets:help_topic' 'alarm-planning' %}">Open</a></td>
+          </tr>
+          <tr>
+            <td>AI Migration</td>
+            <td>Fast migration workflow for converting existing alarms into ANBU .env/.sql/.hql files.</td>
+            <td><a class="btn btn-outline-primary btn-sm" href="{% url 'targets:help_topic' 'ai-migration' %}">Open</a></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h2 class="h5 mb-3">Tab Help Pages</h2>
+    <p class="mb-3">
+      Target edit/detail tabs include a <strong>?</strong> button that opens these pages. Use them while configuring targets.
+    </p>
+    <div class="table-responsive">
+      <table class="table table-sm table-bordered align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Topic</th>
+            <th>Focus</th>
+            <th>Open</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Config</td>
+            <td>Target identity, scheduling, mute logic, and operational flags.</td>
+            <td><a class="btn btn-outline-primary btn-sm" href="{% url 'targets:help_topic' 'config' %}">Open</a></td>
+          </tr>
+          <tr>
+            <td>SQL</td>
+            <td>Single vs multiline mode, SQL contracts, and mappings.</td>
+            <td><a class="btn btn-outline-primary btn-sm" href="{% url 'targets:help_topic' 'sql' %}">Open</a></td>
+          </tr>
+          <tr>
+            <td>Metrics</td>
+            <td>Default metric schema, condition evaluation, and multiline override strategy.</td>
+            <td><a class="btn btn-outline-primary btn-sm" href="{% url 'targets:help_topic' 'metrics' %}">Open</a></td>
+          </tr>
+          <tr>
+            <td>Audit</td>
+            <td>Snapshot/version history, diff, and restore behavior.</td>
+            <td><a class="btn btn-outline-primary btn-sm" href="{% url 'targets:help_topic' 'audit' %}">Open</a></td>
+          </tr>
+          <tr>
+            <td>History</td>
+            <td>Runtime intervals, raw rows, imports, and normal-action replay.</td>
+            <td><a class="btn btn-outline-primary btn-sm" href="{% url 'targets:help_topic' 'history' %}">Open</a></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <h2 class="h5 mb-3">Engine Documentation</h2>
+    <p class="mb-3">
+      For maintainers who need implementation-level behavior, read the detailed engine guide. It documents the runtime flow from scheduler tick to SQL execution, metric evaluation, baseline/deviation, state/severity assignment, and action execution.
+    </p>
+    <a class="btn btn-primary" href="{% url 'targets:help_topic' 'engine' %}">Open Engine Documentation</a>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <h2 class="h5 mb-3">Operational Pages</h2>
+    <div class="row g-3">
+      <div class="col-12 col-md-6">
+        <ul class="mb-0">
+          <li><a href="{% url 'targets:list' %}">Targets</a>: list, filter, bulk operations, open edit/detail.</li>
+          <li><a href="{% url 'targets:explore' %}">Explore</a>: run read-only SQL, save/load query snippets.</li>
+          <li><a href="{% url 'targets:test_actions' %}">Test Actions</a>: execute action script with test payload.</li>
+        </ul>
+      </div>
+      <div class="col-12 col-md-6">
+        <ul class="mb-0">
+          <li><a href="{% url 'targets:logs' %}">Logs</a>: review engine/UI logs, download plain text.</li>
+          <li><a href="{% url 'targets:settings' %}">Settings</a>: application properties, data sources, action properties.</li>
+          <li><a href="/admin/">Admin Console</a>: Django admin objects and user management.</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

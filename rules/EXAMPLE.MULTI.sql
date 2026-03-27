@@ -1,0 +1,9 @@
+SELECT 'SPECIAL' AS metric_name, 3 AS val2, 33 AS val3
+UNION ALL
+SELECT 'SPECIAL2' AS metric_name, 0 AS val2, 00 AS val3
+UNION ALL
+SELECT 'DYNAMIC_ONE' AS metric_name, 7 AS val2, 77 AS val3
+UNION ALL
+SELECT 'DYNAMIC_TWO' AS metric_name, 12 AS val2, 1212 AS val3
+UNION ALL
+SELECT 'DYNAMIC_THREE' AS metric_name, 24 AS val2, 2424 AS val3

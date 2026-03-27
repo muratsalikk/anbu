@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Action Properties | ANBU UI{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h1 class="h3 mb-1">Action Properties</h1>
+    <div class="text-muted small">Select an action to edit its action file path.</div>
+  </div>
+  <div class="d-flex gap-2">
+    <a class="btn btn-outline-secondary" href="{% url 'targets:settings' %}">Back to ANBU Settings</a>
+    <a class="btn btn-primary" href="{% url 'targets:action_new' %}">Add Action</a>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <div class="table-responsive table-grid-wrap-md">
+      <table class="table table-sm table-hover table-bordered align-middle mb-0">
+        <thead class="table-light sticky-top">
+          <tr>
+            <th>Action Name</th>
+            <th>Action File Path</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in rows %}
+            <tr>
+              <td><a href="{{ row.edit_url }}">{{ row.name }}</a></td>
+              <td>{{ row.file_path }}</td>
+            </tr>
+          {% empty %}
+            <tr>
+              <td colspan="2" class="text-center text-muted">No actions found.</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}

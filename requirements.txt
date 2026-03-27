@@ -1,0 +1,9 @@
+streamlit
+pandas
+sqlalchemy
+psycopg[binary]
+croniter
+bcrypt
+st-aggrid
+streamlit-ace
+django==6.0.2

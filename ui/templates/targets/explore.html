@@ -1,0 +1,301 @@
+{% extends "base.html" %}
+{% block title %}Explore | ANBU UI{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h1 class="h3 mb-1">Explore SQL</h1>
+    <div class="text-muted small">Run read-only SQL against configured datasources.</div>
+  </div>
+  <a class="btn btn-outline-secondary" href="{% url 'targets:list' %}">Back to Targets</a>
+</div>
+
+<form method="post" id="explore-form" class="card mb-3">
+  <div class="card-body">
+    {% csrf_token %}
+    {{ form.sql_text }}
+    {{ form.query_name }}
+    <input type="hidden" name="action_hint" id="explore-action-hint" value="">
+    <div class="row g-3 mb-3">
+      <div class="col-12 col-md-4 col-lg-3">
+        <label class="form-label" for="{{ form.datasource.id_for_label }}">Datasource</label>
+        {{ form.datasource }}
+      </div>
+      <div class="col-12 col-md-5 col-lg-5">
+        <label class="form-label" for="{{ form.saved_query.id_for_label }}">Saved Query</label>
+        {{ form.saved_query }}
+      </div>
+      <div class="col-12 col-md-3 col-lg-2 d-flex align-items-end">
+        <button
+          type="submit"
+          name="action"
+          value="load_saved"
+          id="explore-load-btn"
+          class="btn btn-primary w-100">Load</button>
+      </div>
+    </div>
+
+    <div id="explore-sql-editor" class="ace-box mb-3"></div>
+
+    <div class="d-flex gap-2">
+      <button type="submit" name="action" value="run_query" id="explore-run-btn" class="btn btn-primary">Run Query</button>
+      <button type="button" id="explore-save-open-btn" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#explore-save-query-modal">Save Query</button>
+      <button type="submit" name="action" value="save_query" id="explore-save-submit-btn" class="d-none" tabindex="-1" aria-hidden="true">Save Query</button>
+    </div>
+
+    <div id="explore-run-progress-wrap" class="d-none mt-3" aria-live="polite" aria-busy="true">
+      <div class="small text-muted mb-1">Running query...</div>
+      <div class="progress">
+        <div
+          id="explore-run-progress-bar"
+          class="progress-bar bg-success progress-bar-striped progress-bar-animated"
+          role="progressbar"
+          aria-valuenow="100"
+          aria-valuemin="0"
+          aria-valuemax="100"
+          style="width: 75%;"></div>
+      </div>
+    </div>
+  </div>
+</form>
+
+<div class="modal fade" id="explore-save-query-modal" tabindex="-1" aria-labelledby="explore-save-query-modal-label" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h2 class="modal-title h5 mb-0" id="explore-save-query-modal-label">Save Query</h2>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <label for="explore-save-query-name" class="form-label">Query Name</label>
+        <input
+          type="text"
+          id="explore-save-query-name"
+          class="form-control"
+          maxlength="255"
+          autocomplete="off"
+          placeholder="MY_QUERY_NAME">
+        <div id="explore-save-query-name-error" class="invalid-feedback">
+          Query name is required.
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" id="explore-save-confirm-btn" class="btn btn-primary">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{% if run_errors %}
+  <div class="alert alert-danger">
+    {% for err in run_errors %}<div>{{ err }}</div>{% endfor %}
+  </div>
+{% endif %}
+
+{% if query_executed and not run_errors and not rows %}
+  <div class="alert alert-info">Query executed successfully. Returned 0 rows.</div>
+{% endif %}
+
+{% if rows or columns %}
+  <div class="card">
+    <div class="card-body">
+      <h2 class="h6">Result ({{ rows|length }} rows)</h2>
+      <div class="table-responsive table-grid-wrap-lg">
+        <table id="explore-result-table" class="table table-sm table-striped table-bordered align-middle mb-0">
+          <thead class="table-light sticky-top">
+            <tr>
+              {% for col in columns %}
+                <th>{{ col }}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody id="explore-result-body"></tbody>
+        </table>
+      </div>
+      <div class="d-flex justify-content-between align-items-center mt-2">
+        <div id="explore-result-page-summary" class="small text-muted"></div>
+        <div class="btn-group btn-group-sm" role="group" aria-label="Result pagination">
+          <button type="button" id="explore-result-prev" class="btn btn-outline-secondary">Previous</button>
+          <button type="button" id="explore-result-next" class="btn btn-outline-secondary">Next</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  {{ columns|json_script:"explore-columns-json" }}
+  {{ rows|json_script:"explore-rows-json" }}
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function() {
+    const hiddenSqlInput = document.getElementById("id_sql_text");
+    const actionHintInput = document.getElementById("explore-action-hint");
+    const queryNameInput = document.getElementById("id_query_name");
+    const loadBtn = document.getElementById("explore-load-btn");
+    const saveOpenBtn = document.getElementById("explore-save-open-btn");
+    const saveSubmitBtn = document.getElementById("explore-save-submit-btn");
+    const saveConfirmBtn = document.getElementById("explore-save-confirm-btn");
+    const saveQueryNameInput = document.getElementById("explore-save-query-name");
+    const saveQueryNameError = document.getElementById("explore-save-query-name-error");
+    const saveQueryModalEl = document.getElementById("explore-save-query-modal");
+    const saveModal = saveQueryModalEl && window.bootstrap
+      ? window.bootstrap.Modal.getOrCreateInstance(saveQueryModalEl)
+      : null;
+    const runProgressWrap = document.getElementById("explore-run-progress-wrap");
+    const initialSql = hiddenSqlInput ? hiddenSqlInput.value : "";
+    const editor = window.ANBU.initAce("explore-sql-editor", initialSql, {
+      mode: "ace/mode/sql",
+      theme: "ace/theme/github",
+      readOnly: false,
+    });
+
+    const form = document.getElementById("explore-form");
+    if (form && hiddenSqlInput && editor) {
+      form.addEventListener("submit", function(event) {
+        hiddenSqlInput.value = editor.getValue();
+        const submitter = event.submitter || document.activeElement;
+        const actionValue = submitter ? String(submitter.value || "").trim().toLowerCase() : "";
+        if (actionHintInput) {
+          actionHintInput.value = actionValue;
+        }
+        if (actionValue === "run_query" && runProgressWrap) {
+          runProgressWrap.classList.remove("d-none");
+          if (loadBtn) {
+            loadBtn.disabled = true;
+          }
+          if (saveOpenBtn) {
+            saveOpenBtn.disabled = true;
+          }
+        }
+      });
+    }
+
+    function clearSaveNameError() {
+      if (saveQueryNameInput) {
+        saveQueryNameInput.classList.remove("is-invalid");
+      }
+      if (saveQueryNameError) {
+        saveQueryNameError.style.display = "";
+      }
+    }
+
+    if (saveOpenBtn && saveQueryNameInput) {
+      saveOpenBtn.addEventListener("click", function() {
+        saveQueryNameInput.value = String(queryNameInput ? queryNameInput.value || "" : "");
+        clearSaveNameError();
+      });
+    }
+
+    if (saveQueryNameInput) {
+      saveQueryNameInput.addEventListener("input", clearSaveNameError);
+      saveQueryNameInput.addEventListener("keydown", function(event) {
+        if (event.key === "Enter") {
+          event.preventDefault();
+          if (saveConfirmBtn) {
+            saveConfirmBtn.click();
+          }
+        }
+      });
+    }
+
+    if (saveConfirmBtn && queryNameInput && saveSubmitBtn) {
+      saveConfirmBtn.addEventListener("click", function() {
+        const queryName = String(saveQueryNameInput ? saveQueryNameInput.value || "" : "")
+          .trim()
+          .toUpperCase();
+        if (!queryName) {
+          if (saveQueryNameInput) {
+            saveQueryNameInput.classList.add("is-invalid");
+            saveQueryNameInput.focus();
+          }
+          return;
+        }
+        queryNameInput.value = queryName;
+        if (saveModal) {
+          saveModal.hide();
+        }
+        saveSubmitBtn.click();
+      });
+    }
+
+    if (saveQueryModalEl && saveQueryNameInput) {
+      saveQueryModalEl.addEventListener("shown.bs.modal", function() {
+        saveQueryNameInput.focus();
+        saveQueryNameInput.select();
+      });
+    }
+
+    const resultBody = document.getElementById("explore-result-body");
+    const resultPrevBtn = document.getElementById("explore-result-prev");
+    const resultNextBtn = document.getElementById("explore-result-next");
+    const resultSummary = document.getElementById("explore-result-page-summary");
+    const columnsJsonNode = document.getElementById("explore-columns-json");
+    const rowsJsonNode = document.getElementById("explore-rows-json");
+    if (resultBody && resultPrevBtn && resultNextBtn && rowsJsonNode) {
+      let columns = [];
+      try {
+        columns = columnsJsonNode ? JSON.parse(columnsJsonNode.textContent || "[]") : [];
+      } catch (error) {
+        columns = [];
+      }
+      let rows = [];
+      try {
+        rows = JSON.parse(rowsJsonNode.textContent || "[]");
+      } catch (error) {
+        rows = [];
+      }
+      const pageSize = Math.max(1, Number("{{ explore_page_size|default:100 }}") || 100);
+      const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
+      let currentPage = 1;
+
+      function renderResultPage() {
+        resultBody.innerHTML = "";
+        const start = (currentPage - 1) * pageSize;
+        const end = Math.min(start + pageSize, rows.length);
+        for (let rowIdx = start; rowIdx < end; rowIdx += 1) {
+          const tr = document.createElement("tr");
+          const row = Array.isArray(rows[rowIdx]) ? rows[rowIdx] : [];
+          const cellCount = columns.length > 0 ? columns.length : row.length;
+          for (let colIdx = 0; colIdx < cellCount; colIdx += 1) {
+            const value = row[colIdx];
+            const td = document.createElement("td");
+            td.textContent = value === null || value === undefined ? "" : String(value);
+            tr.appendChild(td);
+          }
+          resultBody.appendChild(tr);
+        }
+        resultPrevBtn.disabled = currentPage <= 1;
+        resultNextBtn.disabled = currentPage >= pageCount;
+        if (resultSummary) {
+          if (rows.length === 0) {
+            resultSummary.textContent = "No rows";
+          } else {
+            resultSummary.textContent =
+              "Rows " + String(start + 1) + "-" + String(end) + " of " + String(rows.length) +
+              " | Page " + String(currentPage) + "/" + String(pageCount);
+          }
+        }
+      }
+
+      resultPrevBtn.addEventListener("click", function() {
+        if (currentPage <= 1) {
+          return;
+        }
+        currentPage -= 1;
+        renderResultPage();
+      });
+
+      resultNextBtn.addEventListener("click", function() {
+        if (currentPage >= pageCount) {
+          return;
+        }
+        currentPage += 1;
+        renderResultPage();
+      });
+
+      renderResultPage();
+    }
+  })();
+</script>
+{% endblock %}

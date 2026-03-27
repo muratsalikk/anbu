@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block title %}{{ target_name }} Audit Changes{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h1 class="h4 mb-1">{{ target_name }} Audit Changes</h1>
+    <div class="text-muted small">
+      Selected edit: {{ entry.edited_at }} by {{ entry.edited_by }}
+      {% if previous %}| Previous edit: {{ previous.edited_at }} by {{ previous.edited_by }}{% else %}| Previous edit: none{% endif %}
+    </div>
+  </div>
+  <a class="btn btn-outline-secondary btn-sm" href="{% url 'targets:detail' target_name %}">Back to Target</a>
+</div>
+
+<ul class="nav nav-tabs mb-0" id="audit-diff-tabs" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link active" id="tab-env-diff" data-bs-toggle="tab" data-bs-target="#pane-env-diff" type="button" role="tab" aria-controls="pane-env-diff" aria-selected="true">.env</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="tab-sql-diff" data-bs-toggle="tab" data-bs-target="#pane-sql-diff" type="button" role="tab" aria-controls="pane-sql-diff" aria-selected="false">.sql</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="tab-hql-diff" data-bs-toggle="tab" data-bs-target="#pane-hql-diff" type="button" role="tab" aria-controls="pane-hql-diff" aria-selected="false">.hql</button>
+  </li>
+</ul>
+
+<div class="tab-content border border-top-0 rounded-bottom p-3 bg-white">
+  <div class="tab-pane fade show active" id="pane-env-diff" role="tabpanel" aria-labelledby="tab-env-diff">
+    <pre class="bg-light border rounded p-3 mb-0" style="white-space: pre; overflow: auto;">{{ env_diff }}</pre>
+  </div>
+  <div class="tab-pane fade" id="pane-sql-diff" role="tabpanel" aria-labelledby="tab-sql-diff">
+    <pre class="bg-light border rounded p-3 mb-0" style="white-space: pre; overflow: auto;">{{ sql_diff }}</pre>
+  </div>
+  <div class="tab-pane fade" id="pane-hql-diff" role="tabpanel" aria-labelledby="tab-hql-diff">
+    <pre class="bg-light border rounded p-3 mb-0" style="white-space: pre; overflow: auto;">{{ hql_diff }}</pre>
+  </div>
+</div>
+{% endblock %}

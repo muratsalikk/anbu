@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}{{ target_name }} Audit Snapshot{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h1 class="h4 mb-1">{{ target_name }} Audit Snapshot</h1>
+    <div class="text-muted small">Edited at {{ entry.edited_at }} by {{ entry.edited_by }}</div>
+  </div>
+  <a class="btn btn-outline-secondary btn-sm" href="{% url 'targets:detail' target_name %}">Back to Target</a>
+</div>
+
+<ul class="nav nav-tabs mb-0" id="audit-view-tabs" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button class="nav-link active" id="tab-env" data-bs-toggle="tab" data-bs-target="#pane-env" type="button" role="tab" aria-controls="pane-env" aria-selected="true">.env</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="tab-sql" data-bs-toggle="tab" data-bs-target="#pane-sql" type="button" role="tab" aria-controls="pane-sql" aria-selected="false">.sql</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button class="nav-link" id="tab-hql" data-bs-toggle="tab" data-bs-target="#pane-hql" type="button" role="tab" aria-controls="pane-hql" aria-selected="false">.hql</button>
+  </li>
+</ul>
+
+<div class="tab-content border border-top-0 rounded-bottom p-3 bg-white">
+  <div class="tab-pane fade show active" id="pane-env" role="tabpanel" aria-labelledby="tab-env">
+    <pre class="bg-light border rounded p-3 mb-0" style="white-space: pre-wrap;">{{ entry.env_content }}</pre>
+  </div>
+  <div class="tab-pane fade" id="pane-sql" role="tabpanel" aria-labelledby="tab-sql">
+    <pre class="bg-light border rounded p-3 mb-0" style="white-space: pre-wrap;">{{ entry.sql_content }}</pre>
+  </div>
+  <div class="tab-pane fade" id="pane-hql" role="tabpanel" aria-labelledby="tab-hql">
+    <pre class="bg-light border rounded p-3 mb-0" style="white-space: pre-wrap;">{{ entry.hql_content }}</pre>
+  </div>
+</div>
+{% endblock %}

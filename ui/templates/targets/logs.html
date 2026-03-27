@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+{% block title %}Logs | ANBU UI{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h1 class="h3 mb-1">Logs</h1>
+    <div class="text-muted small">Read Engine and UI logs from configured application properties.</div>
+  </div>
+  <a class="btn btn-outline-secondary" href="{% url 'targets:list' %}">Back to Targets</a>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h2 class="h6 mb-0">System Info</h2>
+      <span class="badge text-bg-light">{{ system_tz }}</span>
+    </div>
+    <div class="row g-3 small">
+      <div class="col-12 col-md-4">
+        <div class="text-muted">Date/Time</div>
+        <div class="fw-semibold">{{ system_now }}</div>
+      </div>
+      <div class="col-12 col-md-4">
+        <div class="text-muted">Hostname</div>
+        <div class="fw-semibold">{{ system_hostname }}</div>
+      </div>
+      <div class="col-12 col-md-4">
+        <div class="text-muted">Server IP</div>
+        <div class="fw-semibold">
+          {% if system_ips %}
+            {{ system_ips|join:", " }}
+          {% else %}
+            -
+          {% endif %}
+        </div>
+      </div>
+      <div class="col-12 col-md-4">
+        <div class="text-muted">PID</div>
+        <div class="fw-semibold">{{ system_pid }}</div>
+      </div>
+      <div class="col-12 col-md-4">
+        <div class="text-muted">Platform</div>
+        <div class="fw-semibold">{{ system_platform }}</div>
+      </div>
+      <div class="col-12 col-md-4">
+        <div class="text-muted">Python</div>
+        <div class="fw-semibold">{{ system_python }}</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<form method="get" class="card mb-3" id="logs-controls-form">
+  <div class="card-body">
+    <input type="hidden" name="tab" id="logs-tab-input" value="{{ active_tab }}">
+    <div class="row g-3 align-items-end">
+      <div class="col-12 col-md-2">
+        <button type="submit" name="action" value="refresh" class="btn btn-outline-secondary w-100">Refresh</button>
+      </div>
+      <div class="col-12 col-md-2">
+        <label class="form-label" for="id_lines">Lines</label>
+        <input
+          type="number"
+          class="form-control"
+          id="id_lines"
+          name="lines"
+          min="1"
+          max="20000"
+          value="{{ line_count }}">
+      </div>
+      <div class="col-12 col-md-3">
+        <label class="form-label" for="id_download_choice">Download log</label>
+        <select class="form-select" id="id_download_choice" name="download_choice">
+          <option value="engine" {% if download_choice == "engine" %}selected{% endif %}>Engine</option>
+          <option value="ui" {% if download_choice == "ui" %}selected{% endif %}>UI</option>
+        </select>
+      </div>
+      <div class="col-12 col-md-2">
+        <button
+          type="submit"
+          name="action"
+          value="download"
+          class="btn btn-primary w-100"
+          {% if download_choice == "engine" and not engine_has_text %}disabled{% endif %}
+          {% if download_choice == "ui" and not ui_has_text %}disabled{% endif %}>Download</button>
+      </div>
+    </div>
+  </div>
+</form>
+
+<ul class="nav nav-tabs mb-0" id="logs-tabs" role="tablist">
+  <li class="nav-item" role="presentation">
+    <button
+      class="nav-link {% if active_tab == 'engine' %}active{% endif %}"
+      id="tab-engine"
+      data-bs-toggle="tab"
+      data-bs-target="#pane-engine"
+      data-log-tab="engine"
+      type="button"
+      role="tab"
+      aria-controls="pane-engine"
+      aria-selected="{% if active_tab == 'engine' %}true{% else %}false{% endif %}">Engine logs</button>
+  </li>
+  <li class="nav-item" role="presentation">
+    <button
+      class="nav-link {% if active_tab == 'ui' %}active{% endif %}"
+      id="tab-ui"
+      data-bs-toggle="tab"
+      data-bs-target="#pane-ui"
+      data-log-tab="ui"
+      type="button"
+      role="tab"
+      aria-controls="pane-ui"
+      aria-selected="{% if active_tab == 'ui' %}true{% else %}false{% endif %}">UI logs</button>
+  </li>
+</ul>
+
+<div class="tab-content border border-top-0 rounded-bottom p-3 bg-white">
+  <div
+    class="tab-pane fade {% if active_tab == 'engine' %}show active{% endif %}"
+    id="pane-engine"
+    role="tabpanel"
+    aria-labelledby="tab-engine">
+    {% if engine_error %}
+      <div class="alert alert-info mb-3">{{ engine_error }}</div>
+    {% endif %}
+    {% if engine_path %}
+      <div class="text-muted small mb-2">File: {{ engine_path }}</div>
+    {% endif %}
+    <textarea class="form-control font-monospace" rows="26" readonly>{{ engine_view }}</textarea>
+  </div>
+  <div
+    class="tab-pane fade {% if active_tab == 'ui' %}show active{% endif %}"
+    id="pane-ui"
+    role="tabpanel"
+    aria-labelledby="tab-ui">
+    {% if ui_error %}
+      <div class="alert alert-info mb-3">{{ ui_error }}</div>
+    {% endif %}
+    {% if ui_path %}
+      <div class="text-muted small mb-2">File: {{ ui_path }}</div>
+    {% endif %}
+    <textarea class="form-control font-monospace" rows="26" readonly>{{ ui_view }}</textarea>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  (function() {
+    const tabInput = document.getElementById("logs-tab-input");
+    const tabStorageKey = "anbu_logs_active_tab";
+    const tabTriggers = document.querySelectorAll("#logs-tabs button[data-bs-toggle='tab']");
+
+    tabTriggers.forEach((tab) => {
+      tab.addEventListener("shown.bs.tab", function(event) {
+        const selected = String(event.target.getAttribute("data-log-tab") || "").trim();
+        if (!selected) {
+          return;
+        }
+        if (tabInput) {
+          tabInput.value = selected;
+        }
+        localStorage.setItem(tabStorageKey, selected);
+      });
+    });
+
+    const url = new URL(window.location.href);
+    const hasTabQuery = url.searchParams.has("tab");
+    if (!hasTabQuery) {
+      const saved = localStorage.getItem(tabStorageKey);
+      if (saved) {
+        const trigger = document.querySelector('#logs-tabs button[data-log-tab="' + saved + '"]');
+        if (trigger) {
+          bootstrap.Tab.getOrCreateInstance(trigger).show();
+          if (tabInput) {
+            tabInput.value = saved;
+          }
+        }
+      }
+    }
+  })();
+</script>
+{% endblock %}

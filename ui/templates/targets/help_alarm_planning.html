@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}Help - Alarm Planning | ANBU UI{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h1 class="h3 mb-1">Alarm Planning (Target + Metrics)</h1>
+    <div class="text-muted small">How to design alarm scenarios before writing target SQL and metric rules.</div>
+  </div>
+  <a class="btn btn-outline-secondary" href="{% url 'targets:help' %}">Back to Help</a>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <h2 class="h5 mb-3">Risk Posture First</h2>
+    <p>
+      Treat missed alarms as a higher-risk failure than extra alarms, but do not accept unlimited noise. A practical operating stance is:
+      <strong>bias toward detection, then tune false positives down in controlled iterations</strong>.
+    </p>
+    <ul class="mb-0">
+      <li>Missed alarm cost: outage extension, compliance impact, customer impact, and delayed response.</li>
+      <li>False positive cost: operator fatigue, ticket churn, and reduced trust in alarms.</li>
+      <li>Goal: high recall with acceptable precision, measured continuously.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <h2 class="h5 mb-3">Target Design Checklist</h2>
+    <ol class="mb-0">
+      <li>Define service objective: what business/system condition this target protects.</li>
+      <li>Define blast radius: what fails if this condition is not detected.</li>
+      <li>Select datasource reliability: verify data freshness and query stability.</li>
+      <li>Pick SQL mode:
+        <br>Use <strong>single</strong> when one row represents one health state.
+        <br>Use <strong>multiline</strong> when one query returns many metric instances (host, queue, region, etc.).
+      </li>
+      <li>Set scheduler/timeout so runtime stays below interval with buffer.</li>
+      <li>Define mute policy only for approved maintenance windows and explicit ownership.</li>
+    </ol>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <h2 class="h5 mb-3">Metrics Strategy: Alarming vs Monitor-Only</h2>
+    <p>
+      Not every metric should generate alarms. ANBU targets can include metrics that are collected for dashboards/trend analysis (for example Grafana)
+      without triggering operational paging.
+    </p>
+    <div class="table-responsive">
+      <table class="table table-sm table-bordered align-middle mb-0">
+        <thead class="table-light">
+          <tr>
+            <th>Metric Type</th>
+            <th>Intent</th>
+            <th>Configuration Guidance</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Alarming metric</td>
+            <td>Immediate operator response is needed.</td>
+            <td>Define clear CRITICAL rules, actionable message, and correct action mapping.</td>
+          </tr>
+          <tr>
+            <td>Monitor-only metric</td>
+            <td>Visibility/trending, no immediate action.</td>
+            <td>Keep metric in target for historical analysis; avoid paging-style action setup.</td>
+          </tr>
+          <tr>
+            <td>Diagnostic metric</td>
+            <td>Used to explain another alarming metric.</td>
+            <td>Collect and chart it; use in message context or runbook links rather than direct alarming.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <h2 class="h5 mb-3">Threshold and Condition Planning</h2>
+    <ul class="mb-0">
+      <li>Start with known failure boundaries (SLO/SLA, capacity limits, saturation points).</li>
+      <li>Use baseline historical data to avoid thresholds based on one incident day.</li>
+      <li>Prefer explicit, explainable conditions over opaque complex formulas at first release.</li>
+      <li>For multiline metrics, verify each metric instance is uniquely mapped and tested.</li>
+      <li>Write alert messages for actionability:
+        <br>what failed, where, current value, threshold, and next step/runbook link.
+      </li>
+    </ul>
+  </div>
+</div>
+
+<div class="card mb-3">
+  <div class="card-body">
+    <h2 class="h5 mb-3">False Positive Control Without Losing Coverage</h2>
+    <ol class="mb-0">
+      <li>Deploy with conservative thresholds that detect likely incidents.</li>
+      <li>Track first-week outcomes: true positive, false positive, missed detection.</li>
+      <li>Tune one variable at a time (threshold, schedule, mute window, query semantics).</li>
+      <li>Do not silence a noisy metric blindly; convert to monitor-only until root cause is understood.</li>
+      <li>Keep audit trail and compare before/after changes in the Audit tab.</li>
+    </ol>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body">
+    <h2 class="h5 mb-3">Operational Governance</h2>
+    <ul class="mb-0">
+      <li>Every alarming metric must have an owner, escalation path, and runbook.</li>
+      <li>Mute windows require reason, scope, start/end, and rollback checkpoint.</li>
+      <li>Review stale muted targets regularly; long mute periods are high risk.</li>
+      <li>Use Test Actions to validate scripts and payloads before production rollout.</li>
+      <li>Use History and Logs pages in post-incident review to improve precision/recall.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="card mt-3">
+  <div class="card-body">
+    <h2 class="h5 mb-3">Related Guides</h2>
+    <ul class="mb-0">
+      <li><a href="{% url 'targets:help_topic' 'ai-migration' %}">AI-Assisted Alarm Migration</a></li>
+      <li><a href="{% url 'targets:help_topic' 'metrics' %}">Metrics Tab Help</a></li>
+      <li><a href="{% url 'targets:help_topic' 'sql' %}">SQL Tab Help</a></li>
+    </ul>
+  </div>
+</div>
+{% endblock %}
