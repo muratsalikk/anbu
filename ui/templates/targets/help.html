@@ -18,19 +18,16 @@
           <tr>
             <th>Guide</th>
             <th>Focus</th>
-            <th>Open</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td>Alarm Planning</td>
+            <td><a href="{% url 'targets:help_topic' 'alarm-planning' %}">Alarm Planning</a></td>
             <td>How to plan target/metric alarm scenarios, monitor-only metrics, and false-positive tuning strategy.</td>
-            <td><a class="btn btn-outline-primary btn-sm" href="{% url 'targets:help_topic' 'alarm-planning' %}">Open</a></td>
           </tr>
           <tr>
-            <td>AI Migration</td>
+            <td><a href="{% url 'targets:help_topic' 'ai-migration' %}">AI Migration</a></td>
             <td>Fast migration workflow for converting existing alarms into ANBU .env/.sql/.hql files.</td>
-            <td><a class="btn btn-outline-primary btn-sm" href="{% url 'targets:help_topic' 'ai-migration' %}">Open</a></td>
           </tr>
         </tbody>
       </table>
@@ -46,34 +43,28 @@
           <tr>
             <th>Topic</th>
             <th>Focus</th>
-            <th>Open</th>
           </tr>
         </thead>
         <tbody>
           <tr>
-            <td>Config</td>
+            <td><a href="{% url 'targets:help_topic' 'config' %}">Config</a></td>
             <td>Target identity, scheduling, mute logic, and operational flags.</td>
-            <td><a class="btn btn-outline-primary btn-sm" href="{% url 'targets:help_topic' 'config' %}">Open</a></td>
           </tr>
           <tr>
-            <td>SQL</td>
+            <td><a href="{% url 'targets:help_topic' 'sql' %}">SQL</a></td>
             <td>Single vs multiline mode, SQL contracts, and mappings.</td>
-            <td><a class="btn btn-outline-primary btn-sm" href="{% url 'targets:help_topic' 'sql' %}">Open</a></td>
           </tr>
           <tr>
-            <td>Metrics</td>
+            <td><a href="{% url 'targets:help_topic' 'metrics' %}">Metrics</a></td>
             <td>Default metric schema, condition evaluation, and multiline override strategy.</td>
-            <td><a class="btn btn-outline-primary btn-sm" href="{% url 'targets:help_topic' 'metrics' %}">Open</a></td>
           </tr>
           <tr>
-            <td>Audit</td>
+            <td><a href="{% url 'targets:help_topic' 'audit' %}">Audit</a></td>
             <td>Snapshot/version history, diff, and restore behavior.</td>
-            <td><a class="btn btn-outline-primary btn-sm" href="{% url 'targets:help_topic' 'audit' %}">Open</a></td>
           </tr>
           <tr>
-            <td>History</td>
+            <td><a href="{% url 'targets:help_topic' 'history' %}">History</a></td>
             <td>Runtime intervals, raw rows, imports, and normal-action replay.</td>
-            <td><a class="btn btn-outline-primary btn-sm" href="{% url 'targets:help_topic' 'history' %}">Open</a></td>
           </tr>
         </tbody>
       </table>
@@ -105,7 +96,7 @@
       <div class="col-12 col-md-6">
         <ul class="mb-0">
           <li><a href="{% url 'targets:logs' %}">Logs</a>: review engine/UI logs, download plain text.</li>
-          <li><a href="{% url 'targets:settings' %}">Settings</a>: application properties, data sources, action properties.</li>
+          <li><a href="{% url 'targets:settings' %}">Settings</a>: application .env, data sources, action properties.</li>
           <li><a href="/admin/">Admin Console</a>: Django admin objects and user management.</li>
         </ul>
       </div>

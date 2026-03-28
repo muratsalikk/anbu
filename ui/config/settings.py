@@ -4,13 +4,20 @@ from pathlib import Path
 import os
 import sys
 
+import runtime_config
+
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-PROJECT_ROOT = BASE_DIR.parent
+PROJECT_ROOT = runtime_config.PROJECT_ROOT
 
 if str(PROJECT_ROOT) not in sys.path:
     # Keep project root for eva/* imports, but prefer modules inside ui/.
     sys.path.append(str(PROJECT_ROOT))
+
+
+for _key, _value in runtime_config.load_bootstrap_env().items():
+    if str(_value or "").strip():
+        os.environ.setdefault(_key, str(_value))
 
 
 def _resolve_path(raw: str, fallback: str) -> Path:
@@ -19,6 +26,14 @@ def _resolve_path(raw: str, fallback: str) -> Path:
     if not path.is_absolute():
         path = (PROJECT_ROOT / path).resolve()
     return path
+
+
+def _env_value(*keys: str, default: str = "") -> str:
+    for key in keys:
+        value = os.getenv(key, "").strip()
+        if value:
+            return value
+    return default
 
 
 SECRET_KEY = os.getenv(
@@ -69,32 +84,16 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
-_ds_host = (
-    os.getenv("DS_HOST", "").strip()
-    or os.getenv("PGHOST", "").strip()
-)
-_ds_port = (
-    os.getenv("DS_PORT", "").strip()
-    or os.getenv("PGPORT", "").strip()
-    or "5432"
-)
-_ds_dbname = (
-    os.getenv("DS_DBNAME", "").strip()
-    or os.getenv("PGDATABASE", "").strip()
-)
-_ds_user = (
-    os.getenv("DS_USER", "").strip()
-    or os.getenv("PGUSER", "").strip()
-)
-_ds_pass = (
-    os.getenv("DS_PASS", "").strip()
-    or os.getenv("PGPASSWORD", "").strip()
-)
+_ds_host = _env_value("PG_HOST", "DS_HOST", "PGHOST")
+_ds_port = _env_value("PG_PORT", "DS_PORT", "PGPORT", default="5432")
+_ds_dbname = _env_value("PG_DBNAME", "DS_DBNAME", "PGDATABASE")
+_ds_user = _env_value("PG_USER", "DS_USER", "PGUSER")
+_ds_pass = _env_value("PG_PASS", "DS_PASS", "PGPASSWORD")
 
 if not (_ds_host and _ds_dbname and _ds_user):
     raise RuntimeError(
-        "PostgreSQL bootstrap config is required. Set DS_HOST/DS_DBNAME/DS_USER "
-        "or PGHOST/PGDATABASE/PGUSER in environment."
+        "PostgreSQL bootstrap config is required. Set PG_HOST/PG_DBNAME/PG_USER "
+        f"in {runtime_config.UI_ENV_PATH} or via environment."
     )
 
 _postgres_db: dict[str, str | int] = {
@@ -131,18 +130,40 @@ LOGIN_URL = "login"
 LOGIN_REDIRECT_URL = "targets:list"
 LOGOUT_REDIRECT_URL = "login"
 
-ANBU_RULES_DIR = _resolve_path("", "./rules")
+ANBU_APP_CONFIG_FILE = runtime_config.UI_ENV_PATH
+ANBU_RULES_DIR = runtime_config.resolve_engine_path(
+    _env_value("RULES_DIR", default=runtime_config.APP_CONFIG_DEFAULTS["RULES_DIR"])
+)
+ANBU_DATASOURCE_DEFINITION_FILE = runtime_config.resolve_engine_path(
+    _env_value(
+        "DATASOURCE_DEFINITION_FILE",
+        default=runtime_config.APP_CONFIG_DEFAULTS["DATASOURCE_DEFINITION_FILE"],
+    )
+)
+ANBU_ACTION_DEFINITION_FILE = runtime_config.resolve_engine_path(
+    _env_value(
+        "ACTION_DEFINITION_FILE",
+        default=runtime_config.APP_CONFIG_DEFAULTS["ACTION_DEFINITION_FILE"],
+    )
+)
 ANBU_SAVED_QUERIES_DIR = _resolve_path(
-    "",
-    "./saved_queries",
+    _env_value(
+        "SAVED_QUERIES_DIR",
+        default=runtime_config.APP_CONFIG_DEFAULTS["SAVED_QUERIES_DIR"],
+    ),
+    runtime_config.APP_CONFIG_DEFAULTS["SAVED_QUERIES_DIR"],
 )
 ANBU_APP_LOGO_FILE = _resolve_path(
-    "",
-    "./ui/static/assets/ico.png",
+    _env_value(
+        "APP_LOGO_FILE",
+        default=runtime_config.APP_CONFIG_DEFAULTS["APP_LOGO_FILE"],
+    ),
+    runtime_config.APP_CONFIG_DEFAULTS["APP_LOGO_FILE"],
 )
 ANBU_AI_PROMPT_FILE = _resolve_path(
-    "",
-    "./prompts/target_ai_prompt.txt",
+    _env_value(
+        "AI_PROMPT_FILE",
+        default=runtime_config.APP_CONFIG_DEFAULTS["AI_PROMPT_FILE"],
+    ),
+    runtime_config.APP_CONFIG_DEFAULTS["AI_PROMPT_FILE"],
 )
-# Datasource/action/application/helper properties are stored in default DB (property_file).
-ANBU_DATASOURCE_DEFINITION_FILE = None

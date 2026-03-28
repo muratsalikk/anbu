@@ -43,14 +43,16 @@ def load_datasource_map(
     datasource_definition_file: Path | None = None,
 ) -> dict[str, Datasource]:
     refs: dict[str, str] = {}
+    base_dir = app_root
     if datasource_definition_text.strip():
         refs = parse_kv_text(datasource_definition_text)
     elif datasource_definition_file:
         refs = _parse_kv_file(datasource_definition_file)
+        base_dir = datasource_definition_file.parent
 
     ds_map: dict[str, Datasource] = {}
     for ds_name, ref in refs.items():
-        cfg_path = _resolve_ref_path(app_root, ref)
+        cfg_path = _resolve_ref_path(base_dir, ref)
         cfg = _parse_kv_file(cfg_path)
         ds_type = cfg.get("TYPE", "").strip().upper()
         user = cfg.get("USER", "").strip()

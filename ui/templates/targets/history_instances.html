@@ -1,0 +1,169 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}{{ rule.target_name }} Raw Instances | ANBU UI{% endblock %}
+{% block head_extra %}
+  <link rel="stylesheet" href="{% static 'vendor/ag-grid/ag-grid.css' %}">
+  <link rel="stylesheet" href="{% static 'vendor/ag-grid/ag-theme-alpine.css' %}">
+{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-3">
+  <div>
+    <h1 class="h3 mb-1">{{ rule.target_name }} Raw Instances</h1>
+    <div class="text-muted small">
+      Latest {{ row_count }} row(s){% if selected_metric %} for metric {{ selected_metric }}{% endif %}.
+    </div>
+  </div>
+  <div class="d-flex gap-2">
+    <button type="button" class="btn btn-outline-secondary" id="raw-return-btn">Back</button>
+  </div>
+</div>
+
+{% if postgres_error %}
+  <div class="alert alert-warning">{{ postgres_error }}</div>
+{% else %}
+  <div class="card">
+    <div class="card-body">
+      <div class="row g-3 align-items-end mb-3">
+        <div class="col-12 col-md-4">
+          <label class="form-label" for="raw-grid-quick-filter">Quick Filter</label>
+          <input
+            type="text"
+            class="form-control"
+            id="raw-grid-quick-filter"
+            placeholder="Search any column">
+        </div>
+        <div class="col-12 col-md-8 text-md-end">
+          <div class="text-muted small">
+            Source: runtime result table. AG Grid is served from offline static vendor assets.
+          </div>
+        </div>
+      </div>
+      <div id="history-raw-grid" class="ag-theme-alpine" style="height: 72vh; min-height: 520px; width: 100%;"></div>
+    </div>
+  </div>
+  {{ rows|json_script:"history-raw-rows" }}
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+  <script src="{% static 'vendor/ag-grid/ag-grid-community.min.js' %}"></script>
+  <script>
+    (function() {
+      const returnBtn = document.getElementById("raw-return-btn");
+      if (returnBtn) {
+        returnBtn.addEventListener("click", function() {
+          if (window.opener && !window.opener.closed) {
+            window.close();
+            return;
+          }
+          if (window.history.length > 1) {
+            window.history.back();
+            return;
+          }
+          window.location.href = "{% url 'targets:detail' rule.target_name %}";
+        });
+      }
+
+      const dataNode = document.getElementById("history-raw-rows");
+      const gridNode = document.getElementById("history-raw-grid");
+      if (!dataNode || !gridNode || typeof agGrid === "undefined") {
+        return;
+      }
+
+      let rowData = [];
+      try {
+        rowData = JSON.parse(dataNode.textContent || "[]");
+      } catch (error) {
+        rowData = [];
+      }
+
+      const selectedMetric = "{{ selected_metric|escapejs }}".trim().toUpperCase();
+      if (selectedMetric) {
+        rowData = rowData.filter((row) => {
+          return String((row && row.metric_name) || "").trim().toUpperCase() === selectedMetric;
+        });
+      }
+
+      function severityBadgeRenderer(params) {
+        const value = String((params && params.value) || "").trim().toUpperCase();
+        const span = document.createElement("span");
+        span.className = "badge text-bg-secondary";
+        span.textContent = value || "UNKNOWN";
+        if (value === "CRITICAL") {
+          span.className = "badge text-bg-danger";
+        } else if (value === "MAJOR") {
+          span.className = "badge text-bg-warning";
+        } else if (value === "MINOR") {
+          span.className = "badge text-bg-info";
+        } else if (value === "NORMAL") {
+          span.className = "badge text-bg-success";
+        }
+        return span;
+      }
+
+      function stateBadgeRenderer(params) {
+        const rawValue = String((params && params.value) || "").trim();
+        const value = rawValue.toLowerCase();
+        const span = document.createElement("span");
+        span.className = "badge text-bg-light border";
+        span.textContent = rawValue || "-";
+        if (value === "ok" || value === "success" || value === "succeeded") {
+          span.className = "badge text-bg-success";
+        } else if (value === "skipped") {
+          span.className = "badge text-bg-secondary";
+        } else if (value.includes("error") || value.includes("fail") || value.includes("exception") || value.includes("timeout")) {
+          span.className = "badge text-bg-danger";
+        }
+        return span;
+      }
+
+      const columnDefs = [
+        { field: "evaluated_at", headerName: "Evaluated At", minWidth: 170, filter: true, sortable: true },
+        { field: "target_name", headerName: "Target", minWidth: 150, filter: true, sortable: true },
+        { field: "metric_name", headerName: "Metric", minWidth: 160, filter: true, sortable: true },
+        { field: "metric_value", headerName: "Metric Value", minWidth: 120, filter: true, sortable: true },
+        { field: "baseline", headerName: "Baseline", minWidth: 110, filter: true, sortable: true },
+        { field: "deviation", headerName: "Deviation", minWidth: 110, filter: true, sortable: true },
+        { field: "severity", headerName: "Severity", minWidth: 120, filter: true, sortable: true, cellRenderer: severityBadgeRenderer },
+        { field: "state", headerName: "State", minWidth: 150, filter: true, sortable: true, cellRenderer: stateBadgeRenderer },
+        { field: "message", headerName: "Message", minWidth: 320, filter: true, sortable: true, wrapText: true, autoHeight: true },
+        { field: "action_name", headerName: "Action", minWidth: 160, filter: true, sortable: true },
+        { field: "datasource", headerName: "Datasource", minWidth: 150, filter: true, sortable: true },
+        { field: "scheduler_name", headerName: "Scheduler", minWidth: 150, filter: true, sortable: true },
+        { field: "tags", headerName: "Tags", minWidth: 180, filter: true, sortable: true },
+        { field: "critical_val", headerName: "Critical Val", minWidth: 120, filter: true, sortable: true },
+        { field: "major_val", headerName: "Major Val", minWidth: 120, filter: true, sortable: true },
+        { field: "minor_val", headerName: "Minor Val", minWidth: 120, filter: true, sortable: true }
+      ];
+
+      const gridOptions = {
+        theme: "legacy",
+        columnDefs: columnDefs,
+        rowData: rowData,
+        animateRows: false,
+        pagination: true,
+        paginationPageSize: 100,
+        defaultColDef: {
+          resizable: true,
+          sortable: true,
+          filter: true,
+          floatingFilter: true,
+        }
+      };
+
+      const gridApi = agGrid.createGrid(gridNode, gridOptions);
+      gridApi.sizeColumnsToFit();
+
+      window.addEventListener("resize", function() {
+        gridApi.sizeColumnsToFit();
+      });
+
+      const quickFilterInput = document.getElementById("raw-grid-quick-filter");
+      if (quickFilterInput) {
+        quickFilterInput.addEventListener("input", function(event) {
+          gridApi.setGridOption("quickFilterText", String((event.target && event.target.value) || ""));
+        });
+      }
+    })();
+  </script>
+{% endblock %}

@@ -3,6 +3,7 @@ from __future__ import annotations
 import copy
 from difflib import unified_diff
 from datetime import datetime
+from decimal import Decimal, InvalidOperation
 import json
 import mimetypes
 import os
@@ -13,9 +14,9 @@ import subprocess
 from typing import Any
 
 import anbu_validators as validators
+import runtime_config
 import storage_env
 import storage_sql
-from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import logout
 from django.contrib.auth.decorators import login_required
@@ -48,11 +49,14 @@ class AppLoginView(LoginView):
 
 APPLICATION_PROPERTY_KEYS = [
     "RULES_DIR",
-    "DS_HOST",
-    "DS_PORT",
-    "DS_DBNAME",
-    "DS_USER",
-    "DS_PASS",
+    "DATASOURCE_DEFINITION_FILE",
+    "ACTION_DEFINITION_FILE",
+    "PG_HOST",
+    "PG_PORT",
+    "PG_DBNAME",
+    "PG_USER",
+    "PG_PASS",
+    "PG_DSN",
     "HELPER_TEXT_FILE",
     "SAVED_QUERIES_DIR",
     "ENGINE_LOG_FILE",
@@ -62,7 +66,7 @@ APPLICATION_PROPERTY_KEYS = [
     "AI_PROMPT_FILE",
 ]
 
-DEFAULT_RULES_DIR = "./rules"
+DEFAULT_RULES_DIR = "../rules"
 DEFAULT_SAVED_QUERIES_DIR = "./saved_queries"
 DEFAULT_APP_LOGO_FILE = "./ui/static/assets/ico.png"
 DEFAULT_AI_PROMPT_FILE = "./prompts/target_ai_prompt.txt"
@@ -136,14 +140,18 @@ Strict ANBU validity rules (must satisfy):
     - METRIC_<n>_CRITICAL_<m>_VAL
     - METRIC_<n>_CRITICAL_<m>_ACTION
     - METRIC_<n>_CRITICAL_<m>_MSG
+    - optional: METRIC_<n>_CRITICAL_<m>_TIMEFRAME (same JSON shape as MUTE_BETWEEN_RULES, single interval)
 - Allowed operators: =, <, >, =<, =>
-- Optional MAJOR/MINOR blocks follow same pattern.
+- Optional MAJOR/MINOR blocks follow same pattern, including optional single-interval _TIMEFRAME.
 
 Condition/message context references allowed:
 - VAL1..VAL10
 - mapped aliases (MAP_VAL*)
 - BASELINE
 - DEVIATION
+- PREVIOUS
+- LAST_WEEK
+- LAST_MONTH
 - TARGET_NAME
 - METRIC_NAME
 - CONDITION_VALUE
@@ -182,7 +190,11 @@ Output policy:
 
 
 def _project_root() -> Path:
-    return Path(str(getattr(settings, "BASE_DIR", Path.cwd()))).parent.resolve()
+    return runtime_config.PROJECT_ROOT
+
+
+def _engine_app_dir() -> Path:
+    return runtime_config.ENGINE_DIR
 
 
 def _resolve_app_path(raw_value: str, fallback: str) -> Path:
@@ -193,9 +205,13 @@ def _resolve_app_path(raw_value: str, fallback: str) -> Path:
     return path
 
 
+def _resolve_engine_path(raw_value: str, fallback: str) -> Path:
+    return runtime_config.resolve_engine_path(raw_value, fallback)
+
+
 def _runtime_rules_dir(properties: dict[str, str] | None = None) -> Path:
     props = properties or _load_application_properties()
-    return _resolve_app_path(str(props.get("RULES_DIR", "") or ""), DEFAULT_RULES_DIR)
+    return _resolve_engine_path(str(props.get("RULES_DIR", "") or ""), DEFAULT_RULES_DIR)
 
 
 def _runtime_saved_queries_dir(properties: dict[str, str] | None = None) -> Path:
@@ -240,13 +256,8 @@ def _is_htmx(request: HttpRequest) -> bool:
 
 
 def _load_datasource_choices() -> list[str]:
-    datasource_content = property_store.get_property_content(
-        "datasources.properties",
-        None,
-    )
     return explore_service.list_datasource_names(
-        datasource_definition_text=datasource_content,
-        datasource_definition_file=None,
+        datasource_definition_file=_datasource_properties_path(),
     )
 
 
@@ -298,6 +309,18 @@ def _parse_change_notes(request: HttpRequest) -> str:
     return raw.replace("\r\n", "\n").replace("\r", "\n").strip()
 
 
+def _format_action_metric_value(value: Any) -> str:
+    if value is None:
+        return ""
+    text = str(value).strip()
+    if not text:
+        return ""
+    try:
+        return str(int(Decimal(text)))
+    except (InvalidOperation, ValueError, TypeError):
+        return text
+
+
 def _build_rule_header(rule: dict[str, Any], target_name: str) -> dict[str, str]:
     return {
         "TARGET_NAME": target_name,
@@ -323,34 +346,30 @@ def _build_rule_header(rule: dict[str, Any], target_name: str) -> dict[str, str]
 
 
 def _application_properties_path() -> Path | None:
-    return None
+    return runtime_config.UI_ENV_PATH
 
 
 def _datasource_properties_path() -> Path | None:
-    return None
+    props = _load_application_properties()
+    return _resolve_engine_path(
+        str(props.get("DATASOURCE_DEFINITION_FILE", "") or ""),
+        runtime_config.APP_CONFIG_DEFAULTS["DATASOURCE_DEFINITION_FILE"],
+    )
 
 
 def _action_properties_path() -> Path | None:
-    return None
+    props = _load_application_properties()
+    return _resolve_engine_path(
+        str(props.get("ACTION_DEFINITION_FILE", "") or ""),
+        runtime_config.APP_CONFIG_DEFAULTS["ACTION_DEFINITION_FILE"],
+    )
 
 
 def _load_application_properties() -> dict[str, str]:
-    data = property_store.get_property_map(
-        "application.properties",
-        _application_properties_path(),
-    )
-    ds_fallbacks = {
-        "DS_HOST": "PG_HOST",
-        "DS_PORT": "PG_PORT",
-        "DS_DBNAME": "PG_DBNAME",
-        "DS_USER": "PG_USER",
-        "DS_PASS": "PG_PASS",
-    }
+    data = runtime_config.load_ui_env()
     loaded: dict[str, str] = {}
     for key in APPLICATION_PROPERTY_KEYS:
         value = str(data.get(key, "") or "")
-        if not value and key in ds_fallbacks:
-            value = str(data.get(ds_fallbacks[key], "") or "")
         if not value and key == "AI_PROMPT_FILE":
             value = DEFAULT_AI_PROMPT_FILE
         loaded[key] = value
@@ -462,13 +481,22 @@ def _reverse_lines(text: str) -> str:
 def _datasource_ref_for_new_name(name: str) -> str:
     cleaned = "".join(ch.lower() if ch.isalnum() else "_" for ch in str(name or ""))
     cleaned = cleaned.strip("_") or "datasource"
-    return f"./ds/{cleaned}.properties"
+    definition_path = _datasource_properties_path()
+    base_dir = definition_path.parent if definition_path else _engine_app_dir()
+    target_path = (_project_root() / "ds" / f"{cleaned}.properties").resolve()
+    try:
+        relative_path = os.path.relpath(target_path, start=base_dir)
+    except ValueError:
+        return str(target_path)
+    return str(Path(relative_path)).replace("\\", "/")
 
 
 def _datasource_ref_path(ref: str) -> Path:
     path = Path(str(ref or "").strip())
     if not path.is_absolute():
-        path = (_runtime_app_root() / path).resolve()
+        definition_path = _datasource_properties_path()
+        base_dir = definition_path.parent if definition_path else _engine_app_dir()
+        path = (base_dir / path).resolve()
     return path
 
 
@@ -791,17 +819,19 @@ def anbu_settings(request: HttpRequest) -> HttpResponse:
     if request.method == "POST":
         form = ApplicationPropertiesForm(request.POST)
         if form.is_valid():
+            current_data = runtime_config.load_ui_env()
             cleaned = {
                 key: str(form.cleaned_data.get(key, "") or "").strip()
                 for key in APPLICATION_PROPERTY_KEYS
             }
+            updated_data = {**current_data, **cleaned}
             property_store.set_property_map(
-                name="application.properties",
-                data=cleaned,
+                name=".env",
+                data=updated_data,
                 fallback_path=_application_properties_path(),
                 key_order=APPLICATION_PROPERTY_KEYS,
             )
-            messages.success(request, "Application properties saved.")
+            messages.success(request, "Application .env saved.")
             return redirect("targets:settings")
     else:
         form = ApplicationPropertiesForm(initial=initial)
@@ -819,6 +849,7 @@ def anbu_settings(request: HttpRequest) -> HttpResponse:
         "targets/settings.html",
         {
             "form": form,
+            "config_path": str(_application_properties_path()),
             "datasource_count": len(datasource_items),
             "action_count": len(action_items),
         },
@@ -1805,18 +1836,37 @@ def target_audit_restore(
 
 @login_required
 @require_GET
-def target_history_instances(request: HttpRequest, target_name: str) -> JsonResponse:
+def target_history_instances(request: HttpRequest, target_name: str) -> HttpResponse:
     rules_dir = _runtime_rules_dir()
     try:
         rule, _ = rules_service.load_rule_for_edit(rules_dir, target_name)
     except FileNotFoundError as exc:
         raise Http404(str(exc)) from exc
     normalized_target_name = str(rule.get("target_name", "") or "").strip().upper()
+    selected_metric = str(request.GET.get("metric_name", "") or "").strip().upper()
+    rows: list[dict[str, Any]] = []
+    postgres_error = ""
     try:
         rows = results_service.get_result_instances(normalized_target_name, limit=1000)
     except Exception as exc:
-        return JsonResponse({"ok": False, "error": str(exc)}, status=500)
-    return JsonResponse({"ok": True, "rows": rows})
+        postgres_error = str(exc)
+    if selected_metric:
+        rows = [
+            row
+            for row in rows
+            if str(row.get("metric_name", "") or "").strip().upper() == selected_metric
+        ]
+    return render(
+        request,
+        "targets/history_instances.html",
+        {
+            "rule": rule,
+            "rows": rows,
+            "row_count": len(rows),
+            "selected_metric": selected_metric,
+            "postgres_error": postgres_error,
+        },
+    )
 
 
 @login_required
@@ -1879,7 +1929,7 @@ def target_history_run_normal_actions(
 
     timeout_sec = int(rule.get("sql_timeout_sec", 60) or 60)
     timeout_sec = max(5, min(timeout_sec, 900))
-    action_root = rules_dir.parent
+    action_root = _engine_app_dir()
     message_text = str(request.POST.get("message", "") or "")
 
     executed = 0
@@ -1943,7 +1993,7 @@ def target_history_run_normal_actions(
             str(script_path),
             normalized_target_name,
             metric_name,
-            "" if metric_value is None else str(metric_value),
+            _format_action_metric_value(metric_value),
             "1",
             message_text,
         ]
@@ -2054,17 +2104,13 @@ def target_history_import(request: HttpRequest, target_name: str) -> JsonRespons
             status=400,
         )
 
-    datasource_content = property_store.get_property_content(
-        "datasources.properties",
-        None,
-    )
+    datasource_definition_file = _datasource_properties_path()
     max_import_rows = 20000
     columns, source_rows, truncated, run_errors = explore_service.run_query(
-        app_root=_runtime_app_root(),
+        app_root=_engine_app_dir(),
         datasource_name=target_datasource,
         sql_text=sql_text,
-        datasource_definition_text=datasource_content,
-        datasource_definition_file=None,
+        datasource_definition_file=datasource_definition_file,
         timeout_sec=120,
         max_rows=max_import_rows,
     )
@@ -2106,10 +2152,7 @@ def target_history_import(request: HttpRequest, target_name: str) -> JsonRespons
 
 @login_required
 def explore(request: HttpRequest) -> HttpResponse:
-    datasource_content = property_store.get_property_content(
-        "datasources.properties",
-        None,
-    )
+    datasource_definition_file = _datasource_properties_path()
     saved_dir = _runtime_saved_queries_dir()
 
     def _sorted_unique(values: list[str]) -> list[str]:
@@ -2191,11 +2234,10 @@ def explore(request: HttpRequest) -> HttpResponse:
                 else:
                     max_explore_rows = 1000
                     columns, raw_rows, truncated, run_errors = explore_service.run_query(
-                        app_root=_runtime_app_root(),
+                        app_root=_engine_app_dir(),
                         datasource_name=selected_datasource,
                         sql_text=sql_text,
-                        datasource_definition_text=datasource_content,
-                        datasource_definition_file=None,
+                        datasource_definition_file=datasource_definition_file,
                         timeout_sec=120,
                         max_rows=max_explore_rows,
                     )
@@ -2394,7 +2436,7 @@ def test_actions(request: HttpRequest) -> HttpResponse:
         else:
             resolved = Path(script_path)
             if not resolved.is_absolute():
-                resolved = (_runtime_app_root() / resolved).resolve()
+                resolved = (_engine_app_dir() / resolved).resolve()
             resolved_script_path = str(resolved)
             if not resolved.exists() or not resolved.is_file():
                 run_error = f"Script not found: {resolved_script_path}"
@@ -2403,7 +2445,7 @@ def test_actions(request: HttpRequest) -> HttpResponse:
                     resolved_script_path,
                     target_name,
                     metric_name,
-                    metric_value,
+                    _format_action_metric_value(metric_value),
                     severity,
                     message,
                 ]

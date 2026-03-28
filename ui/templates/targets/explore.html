@@ -1,5 +1,10 @@
 {% extends "base.html" %}
+{% load static %}
 {% block title %}Explore | ANBU UI{% endblock %}
+{% block head_extra %}
+  <link rel="stylesheet" href="{% static 'vendor/ag-grid/ag-grid.css' %}">
+  <link rel="stylesheet" href="{% static 'vendor/ag-grid/ag-theme-alpine.css' %}">
+{% endblock %}
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-3">
   <div>
@@ -99,26 +104,22 @@
 {% if rows or columns %}
   <div class="card">
     <div class="card-body">
-      <h2 class="h6">Result ({{ rows|length }} rows)</h2>
-      <div class="table-responsive table-grid-wrap-lg">
-        <table id="explore-result-table" class="table table-sm table-striped table-bordered align-middle mb-0">
-          <thead class="table-light sticky-top">
-            <tr>
-              {% for col in columns %}
-                <th>{{ col }}</th>
-              {% endfor %}
-            </tr>
-          </thead>
-          <tbody id="explore-result-body"></tbody>
-        </table>
-      </div>
-      <div class="d-flex justify-content-between align-items-center mt-2">
-        <div id="explore-result-page-summary" class="small text-muted"></div>
-        <div class="btn-group btn-group-sm" role="group" aria-label="Result pagination">
-          <button type="button" id="explore-result-prev" class="btn btn-outline-secondary">Previous</button>
-          <button type="button" id="explore-result-next" class="btn btn-outline-secondary">Next</button>
+      <div class="row g-3 align-items-end mb-3">
+        <div class="col-12 col-md-4">
+          <label class="form-label" for="explore-grid-quick-filter">Quick Filter</label>
+          <input
+            type="text"
+            class="form-control"
+            id="explore-grid-quick-filter"
+            placeholder="Search any column">
+        </div>
+        <div class="col-12 col-md-8 text-md-end">
+          <div class="text-muted small">
+            Result ({{ rows|length }} rows). AG Grid is served from offline static vendor assets.
+          </div>
         </div>
       </div>
+      <div id="explore-result-grid" class="ag-theme-alpine" style="height: 70vh; min-height: 520px; width: 100%;"></div>
     </div>
   </div>
   {{ columns|json_script:"explore-columns-json" }}
@@ -127,6 +128,7 @@
 {% endblock %}
 
 {% block scripts %}
+<script src="{% static 'vendor/ag-grid/ag-grid-community.min.js' %}"></script>
 <script>
   (function() {
     const hiddenSqlInput = document.getElementById("id_sql_text");
@@ -226,13 +228,11 @@
       });
     }
 
-    const resultBody = document.getElementById("explore-result-body");
-    const resultPrevBtn = document.getElementById("explore-result-prev");
-    const resultNextBtn = document.getElementById("explore-result-next");
-    const resultSummary = document.getElementById("explore-result-page-summary");
+    const resultGridNode = document.getElementById("explore-result-grid");
+    const resultQuickFilterInput = document.getElementById("explore-grid-quick-filter");
     const columnsJsonNode = document.getElementById("explore-columns-json");
     const rowsJsonNode = document.getElementById("explore-rows-json");
-    if (resultBody && resultPrevBtn && resultNextBtn && rowsJsonNode) {
+    if (resultGridNode && rowsJsonNode && typeof agGrid !== "undefined") {
       let columns = [];
       try {
         columns = columnsJsonNode ? JSON.parse(columnsJsonNode.textContent || "[]") : [];
@@ -245,56 +245,56 @@
       } catch (error) {
         rows = [];
       }
-      const pageSize = Math.max(1, Number("{{ explore_page_size|default:100 }}") || 100);
-      const pageCount = Math.max(1, Math.ceil(rows.length / pageSize));
-      let currentPage = 1;
+      if (!Array.isArray(columns) || columns.length === 0) {
+        const fallbackLength = rows.length && Array.isArray(rows[0]) ? rows[0].length : 0;
+        columns = Array.from({ length: fallbackLength }, function(_, index) {
+          return "COL_" + String(index + 1);
+        });
+      }
+      const columnDefs = columns.map((columnName, index) => ({
+        field: "col_" + String(index),
+        headerName: String(columnName || "COL_" + String(index + 1)),
+        minWidth: 140,
+        sortable: true,
+        filter: true,
+      }));
+      const rowData = rows.map((row) => {
+        const normalized = {};
+        const source = Array.isArray(row) ? row : [];
+        const cellCount = Math.max(columnDefs.length, source.length);
+        for (let idx = 0; idx < cellCount; idx += 1) {
+          normalized["col_" + String(idx)] = source[idx];
+        }
+        return normalized;
+      });
 
-      function renderResultPage() {
-        resultBody.innerHTML = "";
-        const start = (currentPage - 1) * pageSize;
-        const end = Math.min(start + pageSize, rows.length);
-        for (let rowIdx = start; rowIdx < end; rowIdx += 1) {
-          const tr = document.createElement("tr");
-          const row = Array.isArray(rows[rowIdx]) ? rows[rowIdx] : [];
-          const cellCount = columns.length > 0 ? columns.length : row.length;
-          for (let colIdx = 0; colIdx < cellCount; colIdx += 1) {
-            const value = row[colIdx];
-            const td = document.createElement("td");
-            td.textContent = value === null || value === undefined ? "" : String(value);
-            tr.appendChild(td);
-          }
-          resultBody.appendChild(tr);
-        }
-        resultPrevBtn.disabled = currentPage <= 1;
-        resultNextBtn.disabled = currentPage >= pageCount;
-        if (resultSummary) {
-          if (rows.length === 0) {
-            resultSummary.textContent = "No rows";
-          } else {
-            resultSummary.textContent =
-              "Rows " + String(start + 1) + "-" + String(end) + " of " + String(rows.length) +
-              " | Page " + String(currentPage) + "/" + String(pageCount);
-          }
-        }
+      const gridApi = agGrid.createGrid(resultGridNode, {
+        theme: "legacy",
+        columnDefs: columnDefs,
+        rowData: rowData,
+        animateRows: false,
+        pagination: true,
+        paginationPageSize: Math.max(1, Number("{{ explore_page_size|default:100 }}") || 100),
+        defaultColDef: {
+          resizable: true,
+          sortable: true,
+          filter: true,
+          floatingFilter: true,
+        },
+      });
+
+      if (columnDefs.length <= 8) {
+        gridApi.sizeColumnsToFit();
+        window.addEventListener("resize", function() {
+          gridApi.sizeColumnsToFit();
+        });
       }
 
-      resultPrevBtn.addEventListener("click", function() {
-        if (currentPage <= 1) {
-          return;
-        }
-        currentPage -= 1;
-        renderResultPage();
-      });
-
-      resultNextBtn.addEventListener("click", function() {
-        if (currentPage >= pageCount) {
-          return;
-        }
-        currentPage += 1;
-        renderResultPage();
-      });
-
-      renderResultPage();
+      if (resultQuickFilterInput) {
+        resultQuickFilterInput.addEventListener("input", function(event) {
+          gridApi.setGridOption("quickFilterText", String((event.target && event.target.value) || ""));
+        });
+      }
     }
   })();
 </script>

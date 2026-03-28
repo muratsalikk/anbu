@@ -21,6 +21,7 @@
       <li><code>VALUE</code>: source reference used as main numeric value (<code>VALn</code> or alias).</li>
       <li><code>NORMAL_ACTION</code> + <code>NORMAL_MSG</code>: default path when no severity condition matches.</li>
       <li><code>CRITICAL</code>/<code>MAJOR</code>/<code>MINOR</code> condition arrays.</li>
+      <li><code>TIMEFRAME</code>: optional per-condition single interval using the same JSON shape as <code>MUTE_BETWEEN_RULES</code>, stored as a one-item array.</li>
     </ul>
   </div>
 </div>
@@ -29,7 +30,7 @@
   <div class="card-body">
     <h2 class="h5">Usable Default Parameters in Formulas and Messages</h2>
     <p class="mb-2">
-      Runtime builds a context before evaluating conditions and rendering messages.
+      Runtime builds a context before evaluating conditions and rendering messages. Historical parameters are calculated only when a formula or message actually references them.
     </p>
     <div class="table-responsive">
       <table class="table table-sm table-bordered align-middle mb-0">
@@ -44,8 +45,11 @@
           <tr><td>Mapped aliases</td><td>Friendly names from SQL mapping tab.</td></tr>
           <tr><td><code>TARGET_NAME</code></td><td>Current target key.</td></tr>
           <tr><td><code>METRIC_NAME</code></td><td>Current metric being evaluated.</td></tr>
-          <tr><td><code>BASELINE</code></td><td>Median baseline from historical samples.</td></tr>
-          <tr><td><code>DEVIATION</code></td><td>Median absolute deviation (MAD).</td></tr>
+          <tr><td><code>BASELINE</code></td><td>Historical baseline from matched samples.</td></tr>
+          <tr><td><code>DEVIATION</code></td><td>Historical deviation from matched samples.</td></tr>
+          <tr><td><code>PREVIOUS</code></td><td>Closest previous runtime value before the current evaluation.</td></tr>
+          <tr><td><code>LAST_WEEK</code></td><td>Closest value from the same date/time slot one week earlier.</td></tr>
+          <tr><td><code>LAST_MONTH</code></td><td>Closest value from the same day-of-month/time slot one month earlier.</td></tr>
           <tr><td><code>CONDITION_VALUE</code></td><td>Matched threshold expression result.</td></tr>
         </tbody>
       </table>
@@ -54,6 +58,9 @@
       Message templates support placeholders such as <code>&#123;&#123;METRIC_NAME&#125;&#125;</code>,
       <code>&#123;&#123;BASELINE&#125;&#125;</code>,
       <code>&#123;&#123;DEVIATION&#125;&#125;</code>,
+      <code>&#123;&#123;PREVIOUS&#125;&#125;</code>,
+      <code>&#123;&#123;LAST_WEEK&#125;&#125;</code>,
+      <code>&#123;&#123;LAST_MONTH&#125;&#125;</code>,
       <code>&#123;&#123;CONDITION_VALUE&#125;&#125;</code>, and mapped aliases.
     </p>
   </div>
@@ -64,9 +71,10 @@
     <h2 class="h5">How Evaluation Works</h2>
     <ol class="mb-0">
       <li>Resolve <code>VALUE</code> reference to metric numeric value.</li>
-      <li>Calculate <code>BASELINE</code>/<code>DEVIATION</code> from historical results (same metric, day-of-week, and time window).</li>
+      <li>When referenced, calculate historical parameters such as <code>BASELINE</code>, <code>DEVIATION</code>, <code>PREVIOUS</code>, <code>LAST_WEEK</code>, and <code>LAST_MONTH</code>.</li>
       <li>Evaluate conditions in strict severity order: <code>CRITICAL</code> then <code>MAJOR</code> then <code>MINOR</code>.</li>
       <li>Inside each severity, evaluate condition rows by ascending index; first true condition wins.</li>
+      <li>If a condition has <code>TIMEFRAME</code>, it runs only when the current local time matches one of those windows.</li>
       <li>If no condition matches, severity becomes NORMAL and normal action/message are used.</li>
       <li>Severity number mapping: NORMAL=1, MINOR=2, MAJOR=3, CRITICAL=4.</li>
       <li>Final state may still be <code>action_error</code>, <code>config_error</code>, or <code>data_error</code> depending on action/data issues.</li>
@@ -82,6 +90,7 @@
       <li>Condition value expressions support arithmetic and safe functions: <code>max/min/greatest/least</code>.</li>
       <li>Expressions must evaluate to numeric values; unknown identifiers fail validation/runtime.</li>
       <li>Legacy <code>METRIC_n_SEVERITY_IF</code> exists for backward compatibility, but structured condition arrays are preferred.</li>
+      <li><code>TIMEFRAME</code> format matches <code>MUTE_BETWEEN_RULES</code>, for example <code>[{"start":"23:00","end":"06:00","days":["MON","TUE"]}]</code>. Use one interval per condition.</li>
     </ul>
   </div>
 </div>

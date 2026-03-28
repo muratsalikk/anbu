@@ -81,22 +81,6 @@
         <label class="form-label">Dashboard URL</label>
         <input type="text" class="form-control" value="{{ rule.dashboard_url }}" readonly>
       </div>
-      <div class="col-12 col-md-3">
-        <label class="form-label">Datasource</label>
-        <input type="text" class="form-control" value="{{ rule.data_source }}" readonly>
-      </div>
-      <div class="col-12 col-md-3">
-        <label class="form-label">SQL Mode</label>
-        <input type="text" class="form-control" value="{{ rule.sql_mode }}" readonly>
-      </div>
-      <div class="col-6 col-md-2">
-        <label class="form-label">Timeout(sec)</label>
-        <input type="text" class="form-control" value="{{ rule.sql_timeout_sec }}" readonly>
-      </div>
-      <div class="col-6 col-md-2">
-        <label class="form-label">Jitter(sec)</label>
-        <input type="text" class="form-control" value="{{ rule.sql_jitter_sec }}" readonly>
-      </div>
       <div class="col-12 col-md-4">
         <label class="form-label">Schedule Cron</label>
         <input type="text" class="form-control" value="{{ rule.schedule_cron }}" readonly>
@@ -171,6 +155,24 @@
         title="SQL help"
         aria-label="SQL help">?</a>
     </div>
+    <div class="row g-3 mb-3">
+      <div class="col-12 col-md-4">
+        <label class="form-label">Datasource</label>
+        <input type="text" class="form-control" value="{{ rule.data_source }}" readonly>
+      </div>
+      <div class="col-12 col-md-4">
+        <label class="form-label">SQL Mode</label>
+        <input type="text" class="form-control" value="{{ rule.sql_mode }}" readonly>
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label">Timeout(sec)</label>
+        <input type="text" class="form-control" value="{{ rule.sql_timeout_sec }}" readonly>
+      </div>
+      <div class="col-6 col-md-2">
+        <label class="form-label">Jitter(sec)</label>
+        <input type="text" class="form-control" value="{{ rule.sql_jitter_sec }}" readonly>
+      </div>
+    </div>
     <textarea id="target-sql-hidden" class="d-none">{{ sql_text }}</textarea>
     <div id="target-sql-editor" class="ace-box mb-3"></div>
     <div class="alert alert-light border small">
@@ -226,104 +228,87 @@
                   <label class="form-label">Value</label>
                   <input type="text" class="form-control form-control-sm" value="{{ metric.VALUE }}" readonly>
                 </div>
-                <div class="col-12 col-md-4">
-                  <label class="form-label">Normal Action</label>
-                  <input type="text" class="form-control form-control-sm" value="{{ metric.NORMAL_ACTION }}" readonly>
+              </div>
+
+              <div class="mt-3">
+                <div class="table-responsive table-grid-wrap-sm">
+                  <table class="table table-sm table-striped table-bordered align-middle mb-0">
+                    <thead class="table-light">
+                      <tr>
+                        <th>Severity</th>
+                        <th>Op</th>
+                        <th>Val</th>
+                        <th>Action</th>
+                        <th>Message</th>
+                        <th>Time Frame</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>NORMAL</td>
+                        <td>-</td>
+                        <td>-</td>
+                        <td>{{ metric.NORMAL_ACTION|default:"-" }}</td>
+                        <td>{{ metric.NORMAL_MSG|default:"-" }}</td>
+                        <td>-</td>
+                      </tr>
+                      {% for condition in metric.CRITICAL %}
+                        <tr>
+                          <td>CRITICAL</td>
+                          <td>{{ condition.OPERATOR }}</td>
+                          <td>{{ condition.VAL }}</td>
+                          <td>{{ condition.ACTION }}</td>
+                          <td>{{ condition.MSG }}</td>
+                          <td>
+                            {% if condition.TIMEFRAME %}
+                              {% for item in condition.TIMEFRAME %}
+                                <div>{{ item.start }} - {{ item.end }} ({{ item.days|join:", " }})</div>
+                              {% endfor %}
+                            {% else %}
+                              -
+                            {% endif %}
+                          </td>
+                        </tr>
+                      {% endfor %}
+                      {% for condition in metric.MAJOR %}
+                        <tr>
+                          <td>MAJOR</td>
+                          <td>{{ condition.OPERATOR }}</td>
+                          <td>{{ condition.VAL }}</td>
+                          <td>{{ condition.ACTION }}</td>
+                          <td>{{ condition.MSG }}</td>
+                          <td>
+                            {% if condition.TIMEFRAME %}
+                              {% for item in condition.TIMEFRAME %}
+                                <div>{{ item.start }} - {{ item.end }} ({{ item.days|join:", " }})</div>
+                              {% endfor %}
+                            {% else %}
+                              -
+                            {% endif %}
+                          </td>
+                        </tr>
+                      {% endfor %}
+                      {% for condition in metric.MINOR %}
+                        <tr>
+                          <td>MINOR</td>
+                          <td>{{ condition.OPERATOR }}</td>
+                          <td>{{ condition.VAL }}</td>
+                          <td>{{ condition.ACTION }}</td>
+                          <td>{{ condition.MSG }}</td>
+                          <td>
+                            {% if condition.TIMEFRAME %}
+                              {% for item in condition.TIMEFRAME %}
+                                <div>{{ item.start }} - {{ item.end }} ({{ item.days|join:", " }})</div>
+                              {% endfor %}
+                            {% else %}
+                              -
+                            {% endif %}
+                          </td>
+                        </tr>
+                      {% endfor %}
+                    </tbody>
+                  </table>
                 </div>
-                <div class="col-12 col-md-8">
-                  <label class="form-label">Normal Msg</label>
-                  <input type="text" class="form-control form-control-sm" value="{{ metric.NORMAL_MSG }}" readonly>
-                </div>
-              </div>
-
-              <div class="mt-3">
-                <h3 class="h6 mb-2">Critical</h3>
-                {% if metric.CRITICAL %}
-                  <div class="table-responsive table-grid-wrap-sm">
-                    <table class="table table-sm table-striped table-bordered align-middle mb-0">
-                      <thead class="table-light">
-                        <tr>
-                          <th>Op</th>
-                          <th>Val</th>
-                          <th>Action</th>
-                          <th>Msg</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {% for condition in metric.CRITICAL %}
-                          <tr>
-                            <td>{{ condition.OPERATOR }}</td>
-                            <td>{{ condition.VAL }}</td>
-                            <td>{{ condition.ACTION }}</td>
-                            <td>{{ condition.MSG }}</td>
-                          </tr>
-                        {% endfor %}
-                      </tbody>
-                    </table>
-                  </div>
-                {% else %}
-                  <div class="alert alert-light border mb-0">No critical conditions.</div>
-                {% endif %}
-              </div>
-
-              <div class="mt-3">
-                <h3 class="h6 mb-2">Major</h3>
-                {% if metric.MAJOR %}
-                  <div class="table-responsive table-grid-wrap-sm">
-                    <table class="table table-sm table-striped table-bordered align-middle mb-0">
-                      <thead class="table-light">
-                        <tr>
-                          <th>Op</th>
-                          <th>Val</th>
-                          <th>Action</th>
-                          <th>Msg</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {% for condition in metric.MAJOR %}
-                          <tr>
-                            <td>{{ condition.OPERATOR }}</td>
-                            <td>{{ condition.VAL }}</td>
-                            <td>{{ condition.ACTION }}</td>
-                            <td>{{ condition.MSG }}</td>
-                          </tr>
-                        {% endfor %}
-                      </tbody>
-                    </table>
-                  </div>
-                {% else %}
-                  <div class="alert alert-light border mb-0">No major conditions.</div>
-                {% endif %}
-              </div>
-
-              <div class="mt-3">
-                <h3 class="h6 mb-2">Minor</h3>
-                {% if metric.MINOR %}
-                  <div class="table-responsive table-grid-wrap-sm">
-                    <table class="table table-sm table-striped table-bordered align-middle mb-0">
-                      <thead class="table-light">
-                        <tr>
-                          <th>Op</th>
-                          <th>Val</th>
-                          <th>Action</th>
-                          <th>Msg</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {% for condition in metric.MINOR %}
-                          <tr>
-                            <td>{{ condition.OPERATOR }}</td>
-                            <td>{{ condition.VAL }}</td>
-                            <td>{{ condition.ACTION }}</td>
-                            <td>{{ condition.MSG }}</td>
-                          </tr>
-                        {% endfor %}
-                      </tbody>
-                    </table>
-                  </div>
-                {% else %}
-                  <div class="alert alert-light border mb-0">No minor conditions.</div>
-                {% endif %}
               </div>
             </div>
           </details>
@@ -409,7 +394,7 @@
       </div>
       <div class="col-12 col-md-8">
         <div class="d-flex flex-wrap justify-content-md-end gap-2">
-          <button type="button" class="btn btn-outline-secondary btn-sm" id="history-view-raw-btn">View Raw Instance</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm" id="history-view-raw-btn">View Raw Instances</button>
           <button type="button" class="btn btn-outline-danger btn-sm" id="history-delete-btn">Delete History</button>
           <button type="button" class="btn btn-outline-secondary btn-sm" id="history-refresh-btn">Refresh</button>
           <button type="button" class="btn btn-success btn-sm" id="history-run-normal-btn">Run Normal Action</button>
@@ -436,8 +421,34 @@
             {% for row in history_rows %}
               <tr>
                 <td>{{ row.metric_name }}</td>
-                <td>{{ row.severity }}</td>
-                <td>{{ row.state }}</td>
+                <td>
+                  {% with sev=row.severity|default:''|upper %}
+                    {% if sev == 'CRITICAL' %}
+                      <span class="badge text-bg-danger">CRITICAL</span>
+                    {% elif sev == 'MAJOR' %}
+                      <span class="badge text-bg-warning">MAJOR</span>
+                    {% elif sev == 'MINOR' %}
+                      <span class="badge text-bg-info">MINOR</span>
+                    {% elif sev == 'NORMAL' %}
+                      <span class="badge text-bg-success">NORMAL</span>
+                    {% else %}
+                      <span class="badge text-bg-secondary">{{ row.severity|default:"UNKNOWN" }}</span>
+                    {% endif %}
+                  {% endwith %}
+                </td>
+                <td>
+                  {% with st=row.state|default:''|lower %}
+                    {% if st == 'ok' or st == 'success' or st == 'succeeded' %}
+                      <span class="badge text-bg-success">{{ row.state }}</span>
+                    {% elif st == 'skipped' %}
+                      <span class="badge text-bg-secondary">{{ row.state }}</span>
+                    {% elif 'error' in st or 'fail' in st or 'exception' in st or 'timeout' in st %}
+                      <span class="badge text-bg-danger">{{ row.state }}</span>
+                    {% else %}
+                      <span class="badge text-bg-light border">{{ row.state }}</span>
+                    {% endif %}
+                  {% endwith %}
+                </td>
                 <td>{{ row.started_at }}</td>
                 <td>{{ row.ended_at }}</td>
                 <td>{{ row.last_message }}</td>
@@ -467,20 +478,6 @@
       <a href="{{ dashboard_url_value }}" target="_blank" rel="noopener noreferrer">{{ dashboard_url_value }}</a>
     </div>
   {% endif %}
-</div>
-
-<div class="modal fade" id="historyRawModal" tabindex="-1" aria-labelledby="historyRawModalLabel" aria-hidden="true">
-  <div class="modal-dialog modal-xl modal-dialog-scrollable">
-    <div class="modal-content">
-      <div class="modal-header">
-        <h2 class="modal-title fs-5" id="historyRawModalLabel">Raw Instances</h2>
-        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-      </div>
-      <div class="modal-body" id="history-raw-body">
-        <div class="text-muted small">Raw instances are loaded on demand.</div>
-      </div>
-    </div>
-  </div>
 </div>
 
 <div class="modal fade" id="historyDeleteModal" tabindex="-1" aria-labelledby="historyDeleteModalLabel" aria-hidden="true">
@@ -601,7 +598,7 @@
       });
     }
 
-    const historyInstancesUrl = "{% url 'targets:history_instances' rule.target_name %}";
+    const historyInstancesPageUrl = "{% url 'targets:history_instances' rule.target_name %}";
     const historyDeleteUrl = "{% url 'targets:history_delete' rule.target_name %}";
     const historyImportUrl = "{% url 'targets:history_import' rule.target_name %}";
     const historyRunNormalUrl = "{% url 'targets:history_run_normal_actions' rule.target_name %}";
@@ -647,50 +644,6 @@
       return String(metricFilter.value || "").trim().toUpperCase();
     }
 
-    function renderRawRows(rows, container) {
-      if (!container) {
-        return;
-      }
-      container.innerHTML = "";
-      if (!Array.isArray(rows) || rows.length === 0) {
-        const empty = document.createElement("div");
-        empty.className = "alert alert-light border mb-0";
-        empty.textContent = "No records found.";
-        container.appendChild(empty);
-        return;
-      }
-      const headers = Object.keys(rows[0]);
-      const wrapper = document.createElement("div");
-      wrapper.className = "table-responsive table-grid-wrap-lg";
-      const table = document.createElement("table");
-      table.className = "table table-sm table-striped table-bordered align-middle mb-0";
-      const thead = document.createElement("thead");
-      thead.className = "table-light sticky-top";
-      const headerRow = document.createElement("tr");
-      headers.forEach((key) => {
-        const th = document.createElement("th");
-        th.textContent = key;
-        headerRow.appendChild(th);
-      });
-      thead.appendChild(headerRow);
-      table.appendChild(thead);
-
-      const tbody = document.createElement("tbody");
-      rows.forEach((row) => {
-        const tr = document.createElement("tr");
-        headers.forEach((key) => {
-          const td = document.createElement("td");
-          const value = row[key];
-          td.textContent = value === null || value === undefined ? "" : String(value);
-          tr.appendChild(td);
-        });
-        tbody.appendChild(tr);
-      });
-      table.appendChild(tbody);
-      wrapper.appendChild(table);
-      container.appendChild(wrapper);
-    }
-
     const refreshBtn = document.getElementById("history-refresh-btn");
     if (refreshBtn) {
       refreshBtn.addEventListener("click", function() {
@@ -698,36 +651,15 @@
       });
     }
 
-    const rawModalNode = document.getElementById("historyRawModal");
-    const rawBody = document.getElementById("history-raw-body");
     const viewRawBtn = document.getElementById("history-view-raw-btn");
-    if (rawModalNode && viewRawBtn) {
-      const rawModal = bootstrap.Modal.getOrCreateInstance(rawModalNode);
+    if (viewRawBtn) {
       viewRawBtn.addEventListener("click", async function() {
-        rawModal.show();
-        if (rawBody) {
-          rawBody.innerHTML = '<div class="text-muted">Loading raw instances...</div>';
+        const url = new URL(historyInstancesPageUrl, window.location.origin);
+        const selectedMetric = getSelectedHistoryMetricFromDropdown();
+        if (selectedMetric) {
+          url.searchParams.set("metric_name", selectedMetric);
         }
-        try {
-          const response = await fetch(historyInstancesUrl, {
-            method: "GET",
-            headers: { "X-Requested-With": "XMLHttpRequest" },
-          });
-          const payload = await response.json();
-          if (!response.ok || !payload.ok) {
-            const message = payload && payload.error ? payload.error : "Failed to load raw instances.";
-            throw new Error(message);
-          }
-          renderRawRows(payload.rows || [], rawBody);
-        } catch (error) {
-          if (rawBody) {
-            rawBody.innerHTML = '<div class="alert alert-danger mb-0"></div>';
-            const alertNode = rawBody.querySelector(".alert");
-            if (alertNode) {
-              alertNode.textContent = error && error.message ? error.message : "Failed to load raw instances.";
-            }
-          }
-        }
+        window.open(url.toString(), "_blank", "noopener");
       });
     }
 

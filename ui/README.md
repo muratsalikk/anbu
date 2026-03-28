@@ -10,21 +10,19 @@ This folder contains the Django migration of the Streamlit interface.
 - Ace (SQL editor, vendored in `ui/static/vendor/ace`)
 
 ## Database layout
-- `default` (Postgres): Django auth/admin/session tables + audit + property files.
+- `default` (Postgres): Django auth/admin/session tables + audit.
 - `data_store` (Postgres): runtime/result table `anbu_result`.
 - `rule_audit` (renamed to `target_audit`) is in `default`.
 - `rules/` directory: canonical target persistence store (`<TARGET>.env` + `<TARGET>.sql`).
-- property files are persisted in PostgreSQL table `property_file` and editable from Django admin:
-  - `application.properties`
-  - `datasources.properties`
-  - `actions.properties`
-  - `helper.properties`
+- UI bootstrap/application config lives in `ui/.env`.
+- Datasource/action definition files are edited in place from the paths declared by `DATASOURCE_DEFINITION_FILE` and `ACTION_DEFINITION_FILE` in `ui/.env`.
 
 ## Run
 1. Install dependencies:
    - `py -3 -m pip install -r requirements.txt`
-2. Set PostgreSQL connection values (`DS_HOST`, `DS_PORT`, `DS_DBNAME`, `DS_USER`, `DS_PASS`) via environment
-   or `application.properties`.
+2. Configure `ui/.env`.
+   - The default file is engine-compatible and points to `eva/datasources.properties` and `eva/actions.properties`.
+   - PostgreSQL bootstrap values come from `PG_HOST`, `PG_PORT`, `PG_DBNAME`, `PG_USER`, `PG_PASS`.
 3. Create Django tables on PostgreSQL:
    - `py -3 ui\manage.py migrate`
 4. Create admin user:

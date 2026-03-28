@@ -47,21 +47,33 @@ def _parse_legacy_condition(expr: str) -> tuple[str, str]:
     return op, value
 
 
-def _parse_conditions(raw: dict[str, str], index: int, severity: str) -> list[dict[str, str]]:
-    conditions: dict[int, dict[str, str]] = {}
-    pattern = re.compile(rf"^METRIC_{index}_{severity}_(\d+)_(OPERATOR|VAL|ACTION|MSG)$")
+def _coerce_between_rules(value: object) -> list[dict[str, object]]:
+    if isinstance(value, str):
+        return _parse_between_rules_json(value)
+    return _normalize_between_rules(value)
+
+
+def _parse_conditions(raw: dict[str, str], index: int, severity: str) -> list[dict[str, object]]:
+    conditions: dict[int, dict[str, object]] = {}
+    pattern = re.compile(
+        rf"^METRIC_{index}_{severity}_(\d+)_(OPERATOR|VAL|ACTION|MSG|TIMEFRAME)$"
+    )
     for key, value in raw.items():
         match = pattern.match(key)
         if match:
             cond_index = int(match.group(1))
             field = match.group(2)
-            conditions.setdefault(cond_index, {})[field] = value
+            parsed_value: object = value
+            if field == "TIMEFRAME":
+                parsed_value = _parse_between_rules_json(value)
+            conditions.setdefault(cond_index, {})[field] = parsed_value
 
     if conditions:
         ordered = [conditions[i] for i in sorted(conditions)]
         for cond in ordered:
             if cond.get("OPERATOR"):
-                cond["OPERATOR"] = _normalize_operator(cond["OPERATOR"])
+                cond["OPERATOR"] = _normalize_operator(str(cond["OPERATOR"]))
+            cond["TIMEFRAME"] = _coerce_between_rules(cond.get("TIMEFRAME", []))
         return ordered
 
     legacy = {
@@ -69,10 +81,13 @@ def _parse_conditions(raw: dict[str, str], index: int, severity: str) -> list[di
         "VAL": raw.get(f"METRIC_{index}_{severity}_VAL", ""),
         "ACTION": raw.get(f"METRIC_{index}_{severity}_ACTION", ""),
         "MSG": raw.get(f"METRIC_{index}_{severity}_MSG", ""),
+        "TIMEFRAME": _parse_between_rules_json(
+            raw.get(f"METRIC_{index}_{severity}_TIMEFRAME", "")
+        ),
     }
     if any(legacy.values()):
         if legacy.get("OPERATOR"):
-            legacy["OPERATOR"] = _normalize_operator(legacy["OPERATOR"])
+            legacy["OPERATOR"] = _normalize_operator(str(legacy["OPERATOR"]))
         return [legacy]
 
     legacy_if = raw.get(f"METRIC_{index}_{severity}_IF", "")
@@ -84,6 +99,9 @@ def _parse_conditions(raw: dict[str, str], index: int, severity: str) -> list[di
                 "VAL": val,
                 "ACTION": raw.get(f"METRIC_{index}_{severity}_ACTION", ""),
                 "MSG": raw.get(f"METRIC_{index}_{severity}_MSG", ""),
+                "TIMEFRAME": _parse_between_rules_json(
+                    raw.get(f"METRIC_{index}_{severity}_TIMEFRAME", "")
+                ),
             }
         ]
     return []
@@ -463,6 +481,9 @@ def validate_rule_data(
     allowed_identifiers = set(value_ids) | alias_set | {
         "BASELINE",
         "DEVIATION",
+        "PREVIOUS",
+        "LAST_WEEK",
+        "LAST_MONTH",
         "TARGET_NAME",
         "METRIC_NAME",
         "CONDITION_VALUE",
@@ -513,6 +534,8 @@ def validate_rule_data(
                 cond_value = str(condition.get("VAL", "") or "").strip()
                 action = str(condition.get("ACTION", "") or "").strip()
                 msg = str(condition.get("MSG", "") or "").strip()
+                timeframe_raw = condition.get("TIMEFRAME", [])
+                timeframe_rules = _coerce_between_rules(timeframe_raw)
 
                 if operator and operator not in _OPERATOR_OPTIONS:
                     errors.append(
@@ -544,6 +567,14 @@ def validate_rule_data(
                 errors.extend(
                     validators.validate_condition_tokens(cond_value, allowed_identifiers)
                 )
+                if timeframe_raw not in ("", None, []) and not timeframe_rules:
+                    errors.append(
+                        f"METRIC_{index}_{severity}_{cond_index}_TIMEFRAME must be a valid between-rule array."
+                    )
+                if len(timeframe_rules) > 1:
+                    errors.append(
+                        f"METRIC_{index}_{severity}_{cond_index}_TIMEFRAME supports only one interval."
+                    )
     return errors
 
 

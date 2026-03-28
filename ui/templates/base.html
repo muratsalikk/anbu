@@ -8,6 +8,7 @@
   <link rel="icon" href="{% url 'targets:app_logo' %}">
   <link rel="stylesheet" href="{% static 'vendor/bootstrap/bootstrap.min.css' %}">
   <link rel="stylesheet" href="{% static 'css/app.css' %}">
+  {% block head_extra %}{% endblock %}
 </head>
 <body>
   <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4">

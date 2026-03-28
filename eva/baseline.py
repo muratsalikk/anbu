@@ -14,6 +14,9 @@ class BaselineStats:
     baseline: Optional[int]
     deviation: Optional[int]
     sample_count: int
+    previous: Optional[int]
+    last_week: Optional[int]
+    last_month: Optional[int]
 
 
 def calculate_baseline_stats(
@@ -29,24 +32,34 @@ def calculate_baseline_stats(
     WITH ref AS (
         SELECT
             %(evaluated_at)s::timestamptz AS ref_ts,
+            (%(evaluated_at)s::timestamptz - INTERVAL '7 days') AS last_week_ts,
+            (%(evaluated_at)s::timestamptz - INTERVAL '1 month') AS last_month_ts,
             EXTRACT(ISODOW FROM %(evaluated_at)s::timestamptz AT TIME ZONE 'UTC')::int AS ref_isodow,
             (
                 EXTRACT(HOUR FROM %(evaluated_at)s::timestamptz AT TIME ZONE 'UTC')::int * 60
                 + EXTRACT(MINUTE FROM %(evaluated_at)s::timestamptz AT TIME ZONE 'UTC')::int
-            ) AS ref_mod
+            ) AS ref_mod,
+            (
+                EXTRACT(HOUR FROM (%(evaluated_at)s::timestamptz - INTERVAL '7 days') AT TIME ZONE 'UTC')::int * 60
+                + EXTRACT(MINUTE FROM (%(evaluated_at)s::timestamptz - INTERVAL '7 days') AT TIME ZONE 'UTC')::int
+            ) AS last_week_mod,
+            (
+                EXTRACT(HOUR FROM (%(evaluated_at)s::timestamptz - INTERVAL '1 month') AT TIME ZONE 'UTC')::int * 60
+                + EXTRACT(MINUTE FROM (%(evaluated_at)s::timestamptz - INTERVAL '1 month') AT TIME ZONE 'UTC')::int
+            ) AS last_month_mod,
+            ((%(evaluated_at)s::timestamptz - INTERVAL '7 days') AT TIME ZONE 'UTC')::date AS last_week_date,
+            ((%(evaluated_at)s::timestamptz - INTERVAL '1 month') AT TIME ZONE 'UTC')::date AS last_month_date
     ),
     hist AS (
         SELECT
             r.evaluated_at,
             r.metric_value::double precision AS metric_value,
             (r.evaluated_at AT TIME ZONE 'UTC')::date AS run_date,
-            ref.ref_ts,
-            ABS(
-                (
-                    EXTRACT(HOUR FROM r.evaluated_at AT TIME ZONE 'UTC')::int * 60
-                    + EXTRACT(MINUTE FROM r.evaluated_at AT TIME ZONE 'UTC')::int
-                ) - ref.ref_mod
-            ) AS raw_dist
+            (
+                EXTRACT(HOUR FROM r.evaluated_at AT TIME ZONE 'UTC')::int * 60
+                + EXTRACT(MINUTE FROM r.evaluated_at AT TIME ZONE 'UTC')::int
+            ) AS run_mod,
+            ref.ref_ts
         FROM anbu_result r
         CROSS JOIN ref
         WHERE r.target_name = %(target_name)s
@@ -62,8 +75,10 @@ def calculate_baseline_stats(
             metric_value,
             run_date,
             ref_ts,
-            LEAST(raw_dist, 1440 - raw_dist) AS minute_distance
+            LEAST(ABS(run_mod - ref.ref_mod), 1440 - ABS(run_mod - ref.ref_mod)) AS minute_distance
         FROM hist
+        CROSS JOIN ref
+        WHERE EXTRACT(ISODOW FROM evaluated_at AT TIME ZONE 'UTC')::int = ref.ref_isodow
     ),
     chosen AS (
         SELECT DISTINCT ON (run_date)
@@ -77,10 +92,63 @@ def calculate_baseline_stats(
         FROM ranked
         WHERE minute_distance <= %(max_minute_distance)s
         ORDER BY run_date, minute_distance ASC, evaluated_at DESC
+    ),
+    previous_row AS (
+        SELECT
+            r.metric_value::double precision AS metric_value,
+            r.evaluated_at
+        FROM anbu_result r
+        CROSS JOIN ref
+        WHERE r.target_name = %(target_name)s
+          AND r.metric_name = %(metric_name)s
+          AND r.metric_value IS NOT NULL
+          AND r.evaluated_at < ref.ref_ts
+        ORDER BY r.evaluated_at DESC
+        LIMIT 1
+    ),
+    last_week_ranked AS (
+        SELECT
+            h.metric_value,
+            h.evaluated_at,
+            LEAST(ABS(h.run_mod - ref.last_week_mod), 1440 - ABS(h.run_mod - ref.last_week_mod)) AS minute_distance
+        FROM hist h
+        CROSS JOIN ref
+        WHERE h.run_date = ref.last_week_date
+    ),
+    last_week_row AS (
+        SELECT metric_value, evaluated_at
+        FROM last_week_ranked
+        WHERE minute_distance <= %(max_minute_distance)s
+        ORDER BY minute_distance ASC, evaluated_at DESC
+        LIMIT 1
+    ),
+    last_month_ranked AS (
+        SELECT
+            h.metric_value,
+            h.evaluated_at,
+            LEAST(ABS(h.run_mod - ref.last_month_mod), 1440 - ABS(h.run_mod - ref.last_month_mod)) AS minute_distance
+        FROM hist h
+        CROSS JOIN ref
+        WHERE h.run_date = ref.last_month_date
+    ),
+    last_month_row AS (
+        SELECT metric_value, evaluated_at
+        FROM last_month_ranked
+        WHERE minute_distance <= %(max_minute_distance)s
+        ORDER BY minute_distance ASC, evaluated_at DESC
+        LIMIT 1
     )
-    SELECT metric_value, sample_weight
+    SELECT 'BASELINE' AS stat_name, metric_value, sample_weight
     FROM chosen
-    ORDER BY evaluated_at DESC
+    UNION ALL
+    SELECT 'PREVIOUS' AS stat_name, metric_value, NULL::double precision AS sample_weight
+    FROM previous_row
+    UNION ALL
+    SELECT 'LAST_WEEK' AS stat_name, metric_value, NULL::double precision AS sample_weight
+    FROM last_week_row
+    UNION ALL
+    SELECT 'LAST_MONTH' AS stat_name, metric_value, NULL::double precision AS sample_weight
+    FROM last_month_row
     """
 
     _, rows = main_pg.fetch_all_rows(
@@ -95,13 +163,38 @@ def calculate_baseline_stats(
     )
 
     weighted_values: list[tuple[float, float]] = []
+    previous_value: Optional[int] = None
+    last_week_value: Optional[int] = None
+    last_month_value: Optional[int] = None
+
+    def _to_metric_int(value: object) -> Optional[int]:
+        if value is None:
+            return None
+        try:
+            return int(round(float(value)))
+        except Exception:
+            return None
+
     for row in rows:
-        if not row:
+        if not row or len(row) < 2:
             continue
-        val = row[0]
+        stat_name = str(row[0] or "").strip().upper()
+        val = row[1]
         if val is None:
             continue
-        weight = row[1] if len(row) > 1 else 1
+        if stat_name == "PREVIOUS":
+            if previous_value is None:
+                previous_value = _to_metric_int(val)
+            continue
+        if stat_name == "LAST_WEEK":
+            if last_week_value is None:
+                last_week_value = _to_metric_int(val)
+            continue
+        if stat_name == "LAST_MONTH":
+            if last_month_value is None:
+                last_month_value = _to_metric_int(val)
+            continue
+        weight = row[2] if len(row) > 2 else 1
         try:
             weight_f = float(weight)
         except Exception:
@@ -111,11 +204,25 @@ def calculate_baseline_stats(
         weighted_values.append((float(val), weight_f))
 
     if not weighted_values:
-        return BaselineStats(baseline=None, deviation=None, sample_count=0)
+        return BaselineStats(
+            baseline=None,
+            deviation=None,
+            sample_count=0,
+            previous=previous_value,
+            last_week=last_week_value,
+            last_month=last_month_value,
+        )
 
     total_weight = sum(weight for _, weight in weighted_values)
     if total_weight <= 0:
-        return BaselineStats(baseline=None, deviation=None, sample_count=0)
+        return BaselineStats(
+            baseline=None,
+            deviation=None,
+            sample_count=0,
+            previous=previous_value,
+            last_week=last_week_value,
+            last_month=last_month_value,
+        )
 
     # Recency-weighted baseline/deviation: newest month=3, prior month=2, third month=1.
     baseline_float = sum(val * weight for val, weight in weighted_values) / total_weight
@@ -129,4 +236,7 @@ def calculate_baseline_stats(
         baseline=baseline_int,
         deviation=deviation_int,
         sample_count=len(weighted_values),
+        previous=previous_value,
+        last_week=last_week_value,
+        last_month=last_month_value,
     )

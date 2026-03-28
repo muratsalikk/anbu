@@ -298,7 +298,7 @@
           </div>
           <div class="col-12 col-md-8">
             <div class="d-flex flex-wrap justify-content-md-end gap-2">
-              <button type="button" class="btn btn-outline-secondary btn-sm" id="history-view-raw-btn">View Raw Instance</button>
+              <button type="button" class="btn btn-outline-secondary btn-sm" id="history-view-raw-btn">View Raw Instances</button>
               <button type="button" class="btn btn-outline-danger btn-sm" id="history-delete-btn">Delete History</button>
               <button type="button" class="btn btn-outline-secondary btn-sm" id="history-refresh-btn">Refresh</button>
               <button type="button" class="btn btn-success btn-sm" id="history-run-normal-btn">Run Normal Action</button>
@@ -326,8 +326,34 @@
                 {% for row in history_rows %}
                   <tr>
                     <td>{{ row.metric_name }}</td>
-                    <td>{{ row.severity }}</td>
-                    <td>{{ row.state }}</td>
+                    <td>
+                      {% with sev=row.severity|default:''|upper %}
+                        {% if sev == 'CRITICAL' %}
+                          <span class="badge text-bg-danger">CRITICAL</span>
+                        {% elif sev == 'MAJOR' %}
+                          <span class="badge text-bg-warning">MAJOR</span>
+                        {% elif sev == 'MINOR' %}
+                          <span class="badge text-bg-info">MINOR</span>
+                        {% elif sev == 'NORMAL' %}
+                          <span class="badge text-bg-success">NORMAL</span>
+                        {% else %}
+                          <span class="badge text-bg-secondary">{{ row.severity|default:"UNKNOWN" }}</span>
+                        {% endif %}
+                      {% endwith %}
+                    </td>
+                    <td>
+                      {% with st=row.state|default:''|lower %}
+                        {% if st == 'ok' or st == 'success' or st == 'succeeded' %}
+                          <span class="badge text-bg-success">{{ row.state }}</span>
+                        {% elif st == 'skipped' %}
+                          <span class="badge text-bg-secondary">{{ row.state }}</span>
+                        {% elif 'error' in st or 'fail' in st or 'exception' in st or 'timeout' in st %}
+                          <span class="badge text-bg-danger">{{ row.state }}</span>
+                        {% else %}
+                          <span class="badge text-bg-light border">{{ row.state }}</span>
+                        {% endif %}
+                      {% endwith %}
+                    </td>
                     <td>{{ row.started_at }}</td>
                     <td>{{ row.ended_at }}</td>
                     <td>{{ row.last_message }}</td>
@@ -385,20 +411,6 @@
 </div>
 
 {% if is_edit %}
-  <div class="modal fade" id="historyRawModal" tabindex="-1" aria-labelledby="historyRawModalLabel" aria-hidden="true">
-    <div class="modal-dialog modal-xl modal-dialog-scrollable">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h2 class="modal-title fs-5" id="historyRawModalLabel">Raw Instances</h2>
-          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-        </div>
-        <div class="modal-body" id="history-raw-body">
-          <div class="text-muted small">Raw instances are loaded on demand.</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <div class="modal fade" id="historyDeleteModal" tabindex="-1" aria-labelledby="historyDeleteModalLabel" aria-hidden="true">
     <div class="modal-dialog">
       <div class="modal-content">
@@ -536,9 +548,12 @@
       }
     }
 
-    function parseBetweenRules(value) {
+    function normalizeBetweenRules(value) {
+      let parsed = value;
       try {
-        const parsed = JSON.parse(String(value || "").trim() || "[]");
+        if (typeof value === "string") {
+          parsed = JSON.parse(String(value || "").trim() || "[]");
+        }
         if (!Array.isArray(parsed)) return [];
         return parsed
           .filter((item) => item && typeof item === "object")
@@ -558,15 +573,23 @@
       }
     }
 
-    function makeBetweenRow(rule) {
+    function parseBetweenRules(value) {
+      return normalizeBetweenRules(value);
+    }
+
+    function defaultBetweenRule() {
+      return { start: "23:00", end: "06:00", days: [...betweenDays] };
+    }
+
+    function createBetweenRuleRow(rule, onChange) {
       const row = document.createElement("div");
-      row.className = "border rounded p-2";
+      row.className = "border rounded p-2 between-rule-row";
       const daysChecks = betweenDays
         .map((day) => {
           const checked = rule.days.includes(day) ? "checked" : "";
           return (
             '<label class="form-check form-check-inline me-2">' +
-              '<input class="form-check-input mute-between-day" type="checkbox" value="' + day + '" ' + checked + '>' +
+              '<input class="form-check-input between-rule-day" type="checkbox" value="' + day + '" ' + checked + '>' +
               '<span class="form-check-label small">' + day + '</span>' +
             '</label>'
           );
@@ -576,30 +599,59 @@
         '<div class="row g-2 align-items-end">' +
           '<div class="col-6 col-md-2">' +
             '<label class="form-label small">Start</label>' +
-            '<input type="time" class="form-control form-control-sm mute-between-start" value="' + (rule.start || "00:00") + '">' +
+            '<input type="time" class="form-control form-control-sm between-rule-start" value="' + (rule.start || "00:00") + '">' +
           '</div>' +
           '<div class="col-6 col-md-2">' +
             '<label class="form-label small">End</label>' +
-            '<input type="time" class="form-control form-control-sm mute-between-end" value="' + (rule.end || "00:00") + '">' +
+            '<input type="time" class="form-control form-control-sm between-rule-end" value="' + (rule.end || "00:00") + '">' +
           '</div>' +
           '<div class="col-10 col-md-7">' +
             '<label class="form-label small d-block">Days</label>' +
             daysChecks +
           '</div>' +
           '<div class="col-2 col-md-1 text-end">' +
-            '<button type="button" class="btn btn-outline-danger btn-sm mute-between-remove-btn" title="Remove rule" aria-label="Remove rule">&#128465;</button>' +
+            '<button type="button" class="btn btn-outline-danger btn-sm between-rule-remove-btn" title="Remove rule" aria-label="Remove rule">&#128465;</button>' +
           '</div>' +
         '</div>';
-      const removeBtn = row.querySelector(".mute-between-remove-btn");
+      row.querySelectorAll(".between-rule-start, .between-rule-end, .between-rule-day")
+        .forEach((input) => {
+          input.addEventListener("change", function() {
+            if (typeof onChange === "function") {
+              onChange();
+            }
+          });
+        });
+      const removeBtn = row.querySelector(".between-rule-remove-btn");
       removeBtn.addEventListener("click", function() {
         row.remove();
+        if (typeof onChange === "function") {
+          onChange();
+        }
       });
       return row;
     }
 
+    function collectBetweenRules(container) {
+      if (!container) {
+        return [];
+      }
+      const rules = [];
+      const rows = container.querySelectorAll(".between-rule-row");
+      rows.forEach((row) => {
+        const start = String((row.querySelector(".between-rule-start") || {}).value || "").trim();
+        const end = String((row.querySelector(".between-rule-end") || {}).value || "").trim();
+        const dayNodes = row.querySelectorAll(".between-rule-day:checked");
+        const days = Array.from(dayNodes).map((node) => String(node.value || "").trim().toUpperCase());
+        if (start && end && days.length) {
+          rules.push({ start, end, days });
+        }
+      });
+      return rules;
+    }
+
     function addBetweenRule(rule) {
       if (!betweenRows) return;
-      betweenRows.appendChild(makeBetweenRow(rule || { start: "23:00", end: "06:00", days: [...betweenDays] }));
+      betweenRows.appendChild(createBetweenRuleRow(rule || defaultBetweenRule(), syncBetweenRulesToHidden));
     }
 
     function syncBetweenRulesToHidden() {
@@ -608,17 +660,7 @@
         betweenHidden.value = "";
         return;
       }
-      const rules = [];
-      const rows = betweenRows.querySelectorAll(".border");
-      rows.forEach((row) => {
-        const start = String((row.querySelector(".mute-between-start") || {}).value || "").trim();
-        const end = String((row.querySelector(".mute-between-end") || {}).value || "").trim();
-        const dayNodes = row.querySelectorAll(".mute-between-day:checked");
-        const days = Array.from(dayNodes).map((node) => String(node.value || "").trim().toUpperCase());
-        if (start && end && days.length) {
-          rules.push({ start, end, days });
-        }
-      });
+      const rules = collectBetweenRules(betweenRows);
       betweenHidden.value = rules.length ? JSON.stringify(rules) : "";
     }
 
@@ -874,6 +916,7 @@
         VAL: "",
         ACTION: "",
         MSG: "",
+        TIMEFRAME: [],
       };
     }
 
@@ -895,6 +938,7 @@
         VAL: String(raw.VAL || "").trim(),
         ACTION: String(raw.ACTION || "").trim(),
         MSG: String(raw.MSG || "").trim(),
+        TIMEFRAME: normalizeBetweenRules(raw.TIMEFRAME),
       };
     }
 
@@ -974,6 +1018,9 @@
         [
           "BASELINE",
           "DEVIATION",
+          "PREVIOUS",
+          "LAST_WEEK",
+          "LAST_MONTH",
           "TARGET_NAME",
           "METRIC_NAME",
           "CONDITION_VALUE",
@@ -1164,7 +1211,7 @@
         row.appendChild(actionCol);
 
         const msgCol = document.createElement("div");
-        msgCol.className = "col-12 col-md-5";
+        msgCol.className = "col-12 col-md-4";
         const msgLabel = document.createElement("label");
         msgLabel.className = "form-label small";
         msgLabel.textContent = "Msg";
@@ -1180,6 +1227,112 @@
         });
         msgCol.appendChild(msgInput);
         row.appendChild(msgCol);
+
+        const timeframeToggleCol = document.createElement("div");
+        timeframeToggleCol.className = "col-12 col-md-1 d-flex align-items-end";
+        const timeframeToggleBtn = document.createElement("button");
+        timeframeToggleBtn.type = "button";
+        timeframeToggleBtn.className = "btn btn-outline-secondary btn-sm w-100";
+        timeframeToggleBtn.innerHTML = "&#128339;";
+        timeframeToggleCol.appendChild(timeframeToggleBtn);
+        row.appendChild(timeframeToggleCol);
+
+        const timeframeRules = normalizeBetweenRules(condition.TIMEFRAME);
+        const timeframeRule = timeframeRules.length ? timeframeRules[0] : null;
+        const timeframePanelCol = document.createElement("div");
+        timeframePanelCol.className = timeframeRule ? "col-12" : "col-12 d-none";
+        const timeframeWrap = document.createElement("div");
+        timeframeWrap.className = "border rounded p-2 bg-light";
+        const timeframeDaysChecks = betweenDays
+          .map((day) => {
+            const checked = timeframeRule && Array.isArray(timeframeRule.days) && timeframeRule.days.includes(day)
+              ? "checked"
+              : "";
+            return (
+              '<label class="form-check form-check-inline me-2">' +
+                '<input class="form-check-input condition-timeframe-day" type="checkbox" value="' + day + '" ' + checked + '>' +
+                '<span class="form-check-label small">' + day + '</span>' +
+              '</label>'
+            );
+          })
+          .join("");
+        timeframeWrap.innerHTML =
+          '<div class="row g-2 align-items-end">' +
+            '<div class="col-12 col-md-3">' +
+              '<label class="form-label small">Start</label>' +
+              '<input type="time" class="form-control form-control-sm condition-timeframe-start" value="' + (timeframeRule ? timeframeRule.start : "") + '">' +
+            '</div>' +
+            '<div class="col-12 col-md-3">' +
+              '<label class="form-label small">End</label>' +
+              '<input type="time" class="form-control form-control-sm condition-timeframe-end" value="' + (timeframeRule ? timeframeRule.end : "") + '">' +
+            '</div>' +
+            '<div class="col-12 col-md-4">' +
+              '<label class="form-label small d-block">Days</label>' +
+              timeframeDaysChecks +
+            '</div>' +
+            '<div class="col-12 col-md-2 text-md-end">' +
+              '<button type="button" class="btn btn-outline-danger btn-sm condition-timeframe-clear-btn">Clear</button>' +
+            '</div>' +
+          '</div>';
+        timeframePanelCol.appendChild(timeframeWrap);
+        row.appendChild(timeframePanelCol);
+
+        function collectConditionTimeframe() {
+          const start = String((timeframeWrap.querySelector(".condition-timeframe-start") || {}).value || "").trim();
+          const end = String((timeframeWrap.querySelector(".condition-timeframe-end") || {}).value || "").trim();
+          const dayNodes = timeframeWrap.querySelectorAll(".condition-timeframe-day:checked");
+          const days = Array.from(dayNodes).map((node) => String(node.value || "").trim().toUpperCase());
+          if (start && end && days.length) {
+            return [{ start, end, days }];
+          }
+          return [];
+        }
+
+        function refreshTimeframeToggleButton() {
+          const rules = Array.isArray(metric[severityName][conditionIndex].TIMEFRAME)
+            ? metric[severityName][conditionIndex].TIMEFRAME
+            : [];
+          const hasRules = rules.length > 0;
+          timeframeToggleBtn.className =
+            "btn btn-sm w-100 " + (hasRules ? "btn-outline-primary" : "btn-outline-secondary");
+          timeframeToggleBtn.title = hasRules ? "Edit timeframe" : "Add timeframe";
+          timeframeToggleBtn.setAttribute("aria-label", timeframeToggleBtn.title);
+        }
+
+        function syncConditionTimeframe() {
+          metric[severityName][conditionIndex].TIMEFRAME = collectConditionTimeframe();
+          refreshTimeframeToggleButton();
+          syncMetricsToHidden();
+        }
+
+        timeframeWrap
+          .querySelectorAll(".condition-timeframe-start, .condition-timeframe-end, .condition-timeframe-day")
+          .forEach((input) => {
+            input.addEventListener("change", syncConditionTimeframe);
+          });
+
+        const timeframeClearBtn = timeframeWrap.querySelector(".condition-timeframe-clear-btn");
+        timeframeClearBtn.addEventListener("click", function() {
+          const startInput = timeframeWrap.querySelector(".condition-timeframe-start");
+          const endInput = timeframeWrap.querySelector(".condition-timeframe-end");
+          if (startInput) {
+            startInput.value = "";
+          }
+          if (endInput) {
+            endInput.value = "";
+          }
+          timeframeWrap.querySelectorAll(".condition-timeframe-day").forEach((checkbox) => {
+            checkbox.checked = false;
+          });
+          syncConditionTimeframe();
+          timeframePanelCol.classList.add("d-none");
+        });
+
+        timeframeToggleBtn.addEventListener("click", function() {
+          timeframePanelCol.classList.toggle("d-none");
+        });
+
+        refreshTimeframeToggleButton();
 
         section.appendChild(row);
       });
@@ -1561,6 +1714,87 @@
         ? bootstrap.Modal.getOrCreateInstance(changeNotesModalNode)
         : null;
     let allowSubmitWithNotes = false;
+    let suppressUnsavedChangesWarning = false;
+    let initialFormSnapshot = "";
+    let hasPendingEdits = false;
+    let hasUnsavedChanges = false;
+
+    function syncEditableStateToHidden() {
+      if (hiddenSqlInput && editor) {
+        hiddenSqlInput.value = editor.getValue();
+      }
+      syncMappingStateToHidden();
+      syncBetweenRulesToHidden();
+      syncUntilToHidden();
+      syncMetricsToHidden();
+    }
+
+    function buildFormSnapshot() {
+      if (!form) {
+        return "";
+      }
+      syncEditableStateToHidden();
+      const formData = new FormData(form);
+      const pairs = [];
+      formData.forEach((value, key) => {
+        if (key === "csrfmiddlewaretoken") {
+          return;
+        }
+        pairs.push([
+          String(key || ""),
+          value instanceof File ? String(value.name || "") : String(value || ""),
+        ]);
+      });
+      pairs.sort((left, right) => {
+        if (left[0] === right[0]) {
+          return left[1].localeCompare(right[1]);
+        }
+        return left[0].localeCompare(right[0]);
+      });
+      return JSON.stringify(pairs);
+    }
+
+    function refreshUnsavedChangesState() {
+      if (suppressUnsavedChangesWarning) {
+        hasUnsavedChanges = false;
+        return;
+      }
+      hasUnsavedChanges = buildFormSnapshot() !== initialFormSnapshot;
+    }
+
+    function notePotentialUnsavedChanges() {
+      if (suppressUnsavedChangesWarning) {
+        return;
+      }
+      hasPendingEdits = true;
+    }
+
+    function disableUnsavedChangesWarning() {
+      suppressUnsavedChangesWarning = true;
+      hasPendingEdits = false;
+      hasUnsavedChanges = false;
+    }
+
+    if (form) {
+      initialFormSnapshot = buildFormSnapshot();
+      form.addEventListener("input", notePotentialUnsavedChanges);
+      form.addEventListener("change", notePotentialUnsavedChanges);
+      window.addEventListener("beforeunload", function(event) {
+        if (!hasPendingEdits) {
+          return;
+        }
+        refreshUnsavedChangesState();
+        if (!hasUnsavedChanges) {
+          return;
+        }
+        event.preventDefault();
+        event.returnValue = "";
+      });
+    }
+
+    if (editor && editor.session) {
+      editor.session.on("change", notePotentialUnsavedChanges);
+    }
 
     if (form) {
       form.addEventListener("submit", function(event) {
@@ -1577,13 +1811,8 @@
           return;
         }
         allowSubmitWithNotes = false;
-        if (hiddenSqlInput && editor) {
-          hiddenSqlInput.value = editor.getValue();
-        }
-        syncMappingStateToHidden();
-        syncBetweenRulesToHidden();
-        syncUntilToHidden();
-        syncMetricsToHidden();
+        disableUnsavedChangesWarning();
+        syncEditableStateToHidden();
       });
 
       if (changeNotesModal && changeNotesSubmitBtn && changeNotesField) {
@@ -1597,13 +1826,8 @@
             form.requestSubmit();
             return;
           }
-          if (hiddenSqlInput && editor) {
-            hiddenSqlInput.value = editor.getValue();
-          }
-          syncMappingStateToHidden();
-          syncBetweenRulesToHidden();
-          syncUntilToHidden();
-          syncMetricsToHidden();
+          disableUnsavedChangesWarning();
+          syncEditableStateToHidden();
           form.submit();
         });
       }
@@ -1631,7 +1855,7 @@
     }
 
     {% if is_edit %}
-      const historyInstancesUrl = "{% url 'targets:history_instances' edit_target_name %}";
+      const historyInstancesPageUrl = "{% url 'targets:history_instances' edit_target_name %}";
       const historyDeleteUrl = "{% url 'targets:history_delete' edit_target_name %}";
       const historyImportUrl = "{% url 'targets:history_import' edit_target_name %}";
       const historyRunNormalUrl = "{% url 'targets:history_run_normal_actions' edit_target_name %}";
@@ -1670,50 +1894,6 @@
         }
       }
 
-      function renderRawRows(rows, container) {
-        if (!container) {
-          return;
-        }
-        container.innerHTML = "";
-        if (!Array.isArray(rows) || rows.length === 0) {
-          const empty = document.createElement("div");
-          empty.className = "alert alert-light border mb-0";
-          empty.textContent = "No records found.";
-          container.appendChild(empty);
-          return;
-        }
-        const headers = Object.keys(rows[0]);
-        const wrapper = document.createElement("div");
-        wrapper.className = "table-responsive table-grid-wrap-lg";
-        const table = document.createElement("table");
-        table.className = "table table-sm table-striped table-bordered align-middle mb-0";
-        const thead = document.createElement("thead");
-        thead.className = "table-light sticky-top";
-        const headerRow = document.createElement("tr");
-        headers.forEach((key) => {
-          const th = document.createElement("th");
-          th.textContent = key;
-          headerRow.appendChild(th);
-        });
-        thead.appendChild(headerRow);
-        table.appendChild(thead);
-
-        const tbody = document.createElement("tbody");
-        rows.forEach((row) => {
-          const tr = document.createElement("tr");
-          headers.forEach((key) => {
-            const td = document.createElement("td");
-            const value = row[key];
-            td.textContent = value === null || value === undefined ? "" : String(value);
-            tr.appendChild(td);
-          });
-          tbody.appendChild(tr);
-        });
-        table.appendChild(tbody);
-        wrapper.appendChild(table);
-        container.appendChild(wrapper);
-      }
-
       const refreshBtn = document.getElementById("history-refresh-btn");
       if (refreshBtn) {
         refreshBtn.addEventListener("click", function() {
@@ -1721,36 +1901,15 @@
         });
       }
 
-      const rawModalNode = document.getElementById("historyRawModal");
-      const rawBody = document.getElementById("history-raw-body");
       const viewRawBtn = document.getElementById("history-view-raw-btn");
-      if (rawModalNode && viewRawBtn) {
-        const rawModal = bootstrap.Modal.getOrCreateInstance(rawModalNode);
+      if (viewRawBtn) {
         viewRawBtn.addEventListener("click", async function() {
-          rawModal.show();
-          if (rawBody) {
-            rawBody.innerHTML = '<div class="text-muted">Loading raw instances...</div>';
+          const url = new URL(historyInstancesPageUrl, window.location.origin);
+          const selectedMetric = getSelectedHistoryMetricFromDropdown();
+          if (selectedMetric) {
+            url.searchParams.set("metric_name", selectedMetric);
           }
-          try {
-            const response = await fetch(historyInstancesUrl, {
-              method: "GET",
-              headers: { "X-Requested-With": "XMLHttpRequest" },
-            });
-            const payload = await response.json();
-            if (!response.ok || !payload.ok) {
-              const message = payload && payload.error ? payload.error : "Failed to load raw instances.";
-              throw new Error(message);
-            }
-            renderRawRows(payload.rows || [], rawBody);
-          } catch (error) {
-            if (rawBody) {
-              rawBody.innerHTML = '<div class="alert alert-danger mb-0"></div>';
-              const alertNode = rawBody.querySelector(".alert");
-              if (alertNode) {
-                alertNode.textContent = error && error.message ? error.message : "Failed to load raw instances.";
-              }
-            }
-          }
+          window.open(url.toString(), "_blank", "noopener");
         });
       }
 

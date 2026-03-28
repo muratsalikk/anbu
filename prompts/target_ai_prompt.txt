@@ -68,14 +68,18 @@ Strict ANBU validity rules (must satisfy):
     - METRIC_<n>_CRITICAL_<m>_VAL
     - METRIC_<n>_CRITICAL_<m>_ACTION
     - METRIC_<n>_CRITICAL_<m>_MSG
+    - optional: METRIC_<n>_CRITICAL_<m>_TIMEFRAME (same JSON shape as MUTE_BETWEEN_RULES, single interval)
 - Allowed operators: =, <, >, =<, =>
-- Optional MAJOR/MINOR blocks follow same pattern.
+- Optional MAJOR/MINOR blocks follow same pattern, including optional single-interval _TIMEFRAME.
 
 Condition/message context references allowed:
 - VAL1..VAL10
 - mapped aliases (MAP_VAL*)
 - BASELINE
 - DEVIATION
+- PREVIOUS
+- LAST_WEEK
+- LAST_MONTH
 - TARGET_NAME
 - METRIC_NAME
 - CONDITION_VALUE

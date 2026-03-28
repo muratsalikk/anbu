@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 import re
 from typing import Iterable
@@ -32,7 +33,7 @@ METRIC_FIELD_ORDER = [
 ]
 
 SEVERITY_LEVELS = ["CRITICAL", "MAJOR", "MINOR"]
-CONDITION_FIELDS = ["OPERATOR", "VAL", "ACTION", "MSG"]
+CONDITION_FIELDS = ["OPERATOR", "VAL", "ACTION", "MSG", "TIMEFRAME"]
 
 _ENV_LINE_RE = re.compile(r"^([^=]+)=(.*)$")
 
@@ -85,6 +86,16 @@ def _lines_for_header(header: dict[str, object]) -> Iterable[str]:
             yield f"{key}={_format_value(header[key])}"
 
 
+def _format_condition_value(field: str, value: object) -> str:
+    if field == "TIMEFRAME":
+        if value in ("", None, []):
+            return ""
+        if isinstance(value, str):
+            return _format_value(value)
+        return _format_value(json.dumps(value, separators=(",", ":")))
+    return _format_value(value)
+
+
 def write_rule_env(
     path: str | Path,
     header: dict[str, object],
@@ -124,6 +135,6 @@ def write_rule_env(
                     if value in ("", None):
                         continue
                     key = f"METRIC_{index}_{level}_{cond_index}_{field}"
-                    lines.append(f"{key}={_format_value(value)}")
+                    lines.append(f"{key}={_format_condition_value(field, value)}")
 
     Path(path).write_text("\n".join(lines).rstrip() + "\n", encoding="utf-8")

@@ -4,6 +4,7 @@ import random
 import re
 import time
 import traceback
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -13,8 +14,10 @@ from engine import (
     apply_operator,
     build_alias_map,
     compute_context,
+    is_within_between_rules,
     log_line,
     parse_bool,
+    parse_datetime,
     parse_env_file,
     parse_legacy_if,
     parse_metric_defs,
@@ -40,6 +43,29 @@ from baseline import calculate_baseline_stats
 
 class ConfigError(Exception):
     pass
+
+
+HISTORICAL_CONTEXT_KEYS = (
+    "BASELINE",
+    "DEVIATION",
+    "PREVIOUS",
+    "LAST_WEEK",
+    "LAST_MONTH",
+)
+
+
+def _text_mentions_token(text: str, token: str) -> bool:
+    return bool(re.search(rf"\b{re.escape(token)}\b", str(text or "").upper()))
+
+
+def _find_referenced_history_tokens(texts: list[str]) -> set[str]:
+    refs: set[str] = set()
+    for token in HISTORICAL_CONTEXT_KEYS:
+        for text in texts:
+            if _text_mentions_token(text, token):
+                refs.add(token)
+                break
+    return refs
 
 
 def _insert_result_row_from_pool(**kwargs: Any) -> None:
@@ -81,32 +107,71 @@ def evaluate_metric(
     metric_value_int: Optional[int] = None
     baseline_value: Optional[int] = None
     deviation_value: Optional[int] = None
+    previous_value: Optional[int] = None
+    last_week_value: Optional[int] = None
+    last_month_value: Optional[int] = None
     muted_action_name = "TARGET_MUTED-NO_ACTION_TAKEN" if is_muted else None
     try:
         ctx = compute_context(target_name, metric_name, sql_vals, alias_map)
+        for key in HISTORICAL_CONTEXT_KEYS:
+            ctx[key] = None
+        evaluated_at_local = parse_datetime(evaluated_at_iso)
+        if evaluated_at_local is None:
+            evaluated_at_local = datetime.now().astimezone()
+        elif evaluated_at_local.tzinfo is not None:
+            evaluated_at_local = evaluated_at_local.astimezone()
 
-        baseline_calc_error: Optional[str] = None
-        try:
-            baseline_stats = _calculate_baseline_stats_from_pool(
-                target_name=target_name,
-                metric_name=metric_name,
-                evaluated_at_iso=evaluated_at_iso,
-            )
-            baseline_value = baseline_stats.baseline
-            deviation_value = baseline_stats.deviation
-        except Exception as e:
-            baseline_calc_error = f"baseline calc failed: {e}"
-            baseline_value = None
-            deviation_value = None
+        expr_texts: list[str] = []
+        message_texts: list[str] = [mdef.normal_msg]
+        for sev in SEV_ORDER:
+            for c in mdef.conditions.get(sev, []):
+                if c.timeframe_rules and not is_within_between_rules(
+                    evaluated_at_local, c.timeframe_rules
+                ):
+                    continue
+                expr_texts.append(c.val_expr)
+                message_texts.append(c.msg)
+            if sev in mdef.legacy_if:
+                expr_texts.append(mdef.legacy_if[sev])
+                message_texts.append(
+                    str(env.get(f"METRIC_{mdef.i}_{sev}_MSG", "") or "")
+                )
+
+        required_history_any = _find_referenced_history_tokens(expr_texts + message_texts)
+        required_history_expr = _find_referenced_history_tokens(expr_texts)
+
+        history_calc_error: Optional[str] = None
+        if required_history_any:
+            try:
+                baseline_stats = _calculate_baseline_stats_from_pool(
+                    target_name=target_name,
+                    metric_name=metric_name,
+                    evaluated_at_iso=evaluated_at_iso,
+                )
+                baseline_value = baseline_stats.baseline
+                deviation_value = baseline_stats.deviation
+                previous_value = baseline_stats.previous
+                last_week_value = baseline_stats.last_week
+                last_month_value = baseline_stats.last_month
+            except Exception as e:
+                history_calc_error = f"baseline calc failed: {e}"
+                baseline_value = None
+                deviation_value = None
+                previous_value = None
+                last_week_value = None
+                last_month_value = None
 
         ctx["BASELINE"] = baseline_value
         ctx["DEVIATION"] = deviation_value
+        ctx["PREVIOUS"] = previous_value
+        ctx["LAST_WEEK"] = last_week_value
+        ctx["LAST_MONTH"] = last_month_value
 
         mv = resolve_value_ref(mdef.value_ref, ctx)
         if mv is None:
             msg = f"nodata: metric value missing or non-numeric for ref={mdef.value_ref}"
-            if baseline_calc_error:
-                msg = (msg + f" | {baseline_calc_error}").strip()
+            if history_calc_error and required_history_any:
+                msg = (msg + f" | {history_calc_error}").strip()
             _insert_result_row_from_pool(
                 evaluated_at_iso=evaluated_at_iso,
                 target_name=target_name,
@@ -136,34 +201,16 @@ def evaluate_metric(
         matched_rhs: Optional[float] = None
         data_error = False
         data_error_notes: List[str] = []
-        baseline_missing = False
-        deviation_missing = False
-
-        need_baseline = False
-        need_deviation = False
-        all_exprs = []
-        for sev in SEV_ORDER:
-            for c in mdef.conditions.get(sev, []):
-                all_exprs.append(c.val_expr)
-            if sev in mdef.legacy_if:
-                all_exprs.append(mdef.legacy_if[sev])
-        joined = " ".join(all_exprs).upper()
-        if "BASELINE" in joined:
-            need_baseline = True
-        if "DEVIATION" in joined:
-            need_deviation = True
-        if baseline_calc_error and (need_baseline or need_deviation):
-            data_error_notes.append(baseline_calc_error)
-        if need_baseline and ctx.get("BASELINE") is None:
-            baseline_missing = True
-            data_error = True
-            if "BASELINE missing or null" not in data_error_notes:
-                data_error_notes.append("BASELINE missing or null")
-        if need_deviation and ctx.get("DEVIATION") is None:
-            deviation_missing = True
-            data_error = True
-            if "DEVIATION missing or null" not in data_error_notes:
-                data_error_notes.append("DEVIATION missing or null")
+        missing_expr_tokens: set[str] = set()
+        if history_calc_error and required_history_expr:
+            data_error_notes.append(history_calc_error)
+        for token in HISTORICAL_CONTEXT_KEYS:
+            if token in required_history_expr and ctx.get(token) is None:
+                missing_expr_tokens.add(token)
+                data_error = True
+                note = f"{token} missing or null"
+                if note not in data_error_notes:
+                    data_error_notes.append(note)
 
         ctx["CONDITION_VALUE"] = 0
 
@@ -172,10 +219,11 @@ def evaluate_metric(
             if conds:
                 for c in sorted(conds, key=lambda x: x.idx):
                     try:
-                        expr_upper = c.val_expr.upper()
-                        if baseline_missing and "BASELINE" in expr_upper:
+                        if c.timeframe_rules and not is_within_between_rules(
+                            evaluated_at_local, c.timeframe_rules
+                        ):
                             continue
-                        if deviation_missing and "DEVIATION" in expr_upper:
+                        if _find_referenced_history_tokens([c.val_expr]) & missing_expr_tokens:
                             continue
                         rhs = safe_eval_expr(c.val_expr, ctx)
                         if apply_operator(float(mv), c.operator, rhs):
@@ -190,8 +238,7 @@ def evaluate_metric(
                     break
             elif sev in mdef.legacy_if:
                 expr_text = mdef.legacy_if[sev]
-                expr_upper = expr_text.upper()
-                if (baseline_missing and "BASELINE" in expr_upper) or (deviation_missing and "DEVIATION" in expr_upper):
+                if _find_referenced_history_tokens([expr_text]) & missing_expr_tokens:
                     continue
                 try:
                     lhs_s, op_s, rhs_s = parse_legacy_if(expr_text)
@@ -206,8 +253,23 @@ def evaluate_metric(
                 except Exception as e:
                     raise ConfigError(f"Legacy IF eval failed: {expr_text}") from e
 
-        ctx["CONDITION_VALUE"] = matched_rhs if matched_rhs is not None else 0
-        msg_final = render_message(matched_msg_tmpl, ctx).strip()
+        display_ctx = dict(ctx)
+        display_ctx["CONDITION_VALUE"] = int(matched_rhs) if matched_rhs is not None else 0
+
+        value_ref_key = str(mdef.value_ref or "").strip()
+        if value_ref_key:
+            display_ctx[value_ref_key] = metric_value_int
+            for alias, source in alias_map.items():
+                alias_key = str(alias or "").strip()
+                source_key = str(source or "").strip()
+                if not alias_key or not source_key:
+                    continue
+                if alias_key == value_ref_key:
+                    display_ctx[source_key] = metric_value_int
+                if source_key == value_ref_key:
+                    display_ctx[alias_key] = metric_value_int
+
+        msg_final = render_message(matched_msg_tmpl, display_ctx).strip()
         if data_error_notes:
             note = "; ".join(data_error_notes)
             if msg_final:

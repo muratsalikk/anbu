@@ -1,10 +1,13 @@
 from __future__ import annotations
 
 import ast
+import json
 import re
 import subprocess
 from dataclasses import dataclass
 from datetime import datetime, time as dt_time
+from decimal import Decimal, InvalidOperation
+import math
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -56,6 +59,82 @@ def parse_datetime(value: str) -> Optional[datetime]:
         return datetime.fromisoformat(text)
     except Exception:
         return None
+
+
+BETWEEN_DAY_VALUES = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
+
+
+@dataclass
+class BetweenRule:
+    start: dt_time
+    end: dt_time
+    days: set[str]
+
+
+def normalize_between_days(value: object) -> set[str]:
+    if isinstance(value, str):
+        raw_items = [part.strip().upper() for part in value.split(",")]
+    elif isinstance(value, list):
+        raw_items = [str(item).strip().upper() for item in value]
+    else:
+        raw_items = []
+    days: set[str] = set()
+    for item in raw_items:
+        if item in BETWEEN_DAY_VALUES:
+            days.add(item)
+    if not days:
+        days = set(BETWEEN_DAY_VALUES)
+    return days
+
+
+def parse_between_rules_json(value: str) -> List[BetweenRule]:
+    raw = (value or "").strip()
+    if not raw:
+        return []
+    try:
+        parsed = json.loads(raw)
+    except json.JSONDecodeError:
+        return []
+    if not isinstance(parsed, list):
+        return []
+    rules: List[BetweenRule] = []
+    for item in parsed:
+        if not isinstance(item, dict):
+            continue
+        start_hm = parse_hhmm(str(item.get("start", "")).strip())
+        end_hm = parse_hhmm(str(item.get("end", "")).strip())
+        if not start_hm or not end_hm:
+            continue
+        days = normalize_between_days(item.get("days", []))
+        rules.append(
+            BetweenRule(
+                start=start_hm,
+                end=end_hm,
+                days=days,
+            )
+        )
+    return rules
+
+
+def is_within_between_rules(current_local: datetime, between_rules: List[BetweenRule]) -> bool:
+    if not between_rules:
+        return False
+    t = current_local.time()
+    weekday = BETWEEN_DAY_VALUES[current_local.weekday()]
+    for between_rule in between_rules:
+        if between_rule.days and weekday not in between_rule.days:
+            continue
+        start = between_rule.start
+        end = between_rule.end
+        if start == end:
+            return True
+        if start < end:
+            if start <= t < end:
+                return True
+            continue
+        if t >= start or t < end:
+            return True
+    return False
 
 
 def read_kv_file(path: Path) -> Dict[str, str]:
@@ -223,6 +302,7 @@ class Condition:
     val_expr: str
     action: str
     msg: str
+    timeframe_rules: List[BetweenRule]
 
 
 @dataclass
@@ -264,7 +344,10 @@ def parse_metric_defs(env: Dict[str, str]) -> List[MetricDef]:
             idxs = set()
             for k in env.keys():
                 if k.startswith(prefix):
-                    m = re.match(rf"^{re.escape(prefix)}(\d+)_(OPERATOR|VAL|ACTION|MSG)$", k)
+                    m = re.match(
+                        rf"^{re.escape(prefix)}(\d+)_(OPERATOR|VAL|ACTION|MSG|TIMEFRAME)$",
+                        k,
+                    )
                     if m:
                         idxs.add(int(m.group(1)))
             for idx in sorted(idxs):
@@ -272,17 +355,49 @@ def parse_metric_defs(env: Dict[str, str]) -> List[MetricDef]:
                 ve = env.get(f"{prefix}{idx}_VAL", "").strip()
                 ac = env.get(f"{prefix}{idx}_ACTION", "").strip()
                 ms = env.get(f"{prefix}{idx}_MSG", "").strip()
+                tf = parse_between_rules_json(
+                    env.get(f"{prefix}{idx}_TIMEFRAME", "").strip()
+                )
+                if len(tf) > 1:
+                    raise ValueError(
+                        f"{prefix}{idx}_TIMEFRAME supports only one interval"
+                    )
                 if not op or not ve:
                     continue
-                conditions[sev].append(Condition(idx=idx, operator=op, val_expr=ve, action=ac, msg=ms))
+                conditions[sev].append(
+                    Condition(
+                        idx=idx,
+                        operator=op,
+                        val_expr=ve,
+                        action=ac,
+                        msg=ms,
+                        timeframe_rules=tf,
+                    )
+                )
 
             if not conditions[sev]:
                 op = env.get(f"METRIC_{i}_{sev}_OPERATOR", "").strip()
                 ve = env.get(f"METRIC_{i}_{sev}_VAL", "").strip()
                 ac = env.get(f"METRIC_{i}_{sev}_ACTION", "").strip()
                 ms = env.get(f"METRIC_{i}_{sev}_MSG", "").strip()
+                tf = parse_between_rules_json(
+                    env.get(f"METRIC_{i}_{sev}_TIMEFRAME", "").strip()
+                )
+                if len(tf) > 1:
+                    raise ValueError(
+                        f"METRIC_{i}_{sev}_TIMEFRAME supports only one interval"
+                    )
                 if op and ve:
-                    conditions[sev].append(Condition(idx=1, operator=op, val_expr=ve, action=ac, msg=ms))
+                    conditions[sev].append(
+                        Condition(
+                            idx=1,
+                            operator=op,
+                            val_expr=ve,
+                            action=ac,
+                            msg=ms,
+                            timeframe_rules=tf,
+                        )
+                    )
 
             if not conditions[sev]:
                 if_expr = env.get(f"METRIC_{i}_{sev}_IF", "").strip()
@@ -327,7 +442,7 @@ def render_message(template: str, ctx: Dict[str, Any]) -> str:
     def repl(m: re.Match) -> str:
         key = m.group(1)
         val = ctx.get(key)
-        return "" if val is None else str(val)
+        return format_numeric_display(val)
     return PLACEHOLDER_RE.sub(repl, template or "")
 
 
@@ -375,6 +490,41 @@ def resolve_value_ref(value_ref: str, ctx: Dict[str, Any]) -> Optional[float]:
         return None
 
 
+def _coerce_decimal(value: Any) -> Optional[Decimal]:
+    if value is None or isinstance(value, bool):
+        return None
+    if isinstance(value, Decimal):
+        return value
+    if isinstance(value, int):
+        return Decimal(value)
+    if isinstance(value, float):
+        if not math.isfinite(value):
+            return None
+        return Decimal(str(value))
+    return None
+
+
+def format_numeric_display(value: Any, *, truncate: bool = False) -> str:
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        return str(value)
+    number = _coerce_decimal(value)
+    if number is None:
+        return str(value)
+    if truncate:
+        try:
+            return str(int(number))
+        except (InvalidOperation, ValueError, OverflowError):
+            return str(value)
+    try:
+        if number == number.to_integral_value():
+            return str(int(number))
+    except (InvalidOperation, ValueError, OverflowError):
+        return str(value)
+    return str(value)
+
+
 def compute_context(
     target_name: str,
     metric_name: str,
@@ -405,7 +555,7 @@ def run_action(
         script_path,
         str(target_name),
         str(metric_name),
-        "" if metric_value is None else str(metric_value),
+        format_numeric_display(metric_value, truncate=True),
         str(severity),
         message or "",
     ]

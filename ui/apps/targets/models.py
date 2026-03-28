@@ -40,32 +40,6 @@ class TargetAudit(models.Model):
         ordering = ["-edited_at", "-id"]
 
 
-class PropertyFile(models.Model):
-    APPLICATION = "application.properties"
-    DATASOURCES = "datasources.properties"
-    ACTIONS = "actions.properties"
-    HELPER = "helper.properties"
-
-    NAME_CHOICES = [
-        (APPLICATION, APPLICATION),
-        (DATASOURCES, DATASOURCES),
-        (ACTIONS, ACTIONS),
-        (HELPER, HELPER),
-    ]
-
-    name = models.CharField(max_length=128, unique=True, choices=NAME_CHOICES)
-    content = models.TextField(blank=True, default="")
-    updated_at = models.DateTimeField(auto_now=True)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        db_table = "property_file"
-        ordering = ["name"]
-
-    def __str__(self) -> str:
-        return self.name
-
-
 class SavedQuery(models.Model):
     name = models.CharField(max_length=255, unique=True, db_index=True)
     datasource = models.CharField(max_length=255, db_index=True)

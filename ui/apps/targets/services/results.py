@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone as dt_timezone
+from decimal import Decimal
 from typing import Any
 
 from django.db import connections
@@ -49,6 +50,18 @@ def _format_dt(value: Any) -> str:
         )
         return dt_value.strftime("%Y-%m-%d %H:%M:%S")
     return "" if value is None else str(value)
+
+
+def _normalize_intish(value: Any) -> Any:
+    if isinstance(value, bool) or value is None:
+        return value
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value) if value.is_integer() else value
+    if isinstance(value, Decimal):
+        return int(value) if value == value.to_integral_value() else value
+    return value
 
 
 def get_runtime_states(target_names: list[str]) -> dict[str, dict[str, Any]]:
@@ -295,6 +308,15 @@ def get_result_instances(target_name: str, limit: int = 1000) -> list[dict[str, 
         rows = _rows_to_dicts(cursor)
     for row in rows:
         row["evaluated_at"] = _format_dt(row.get("evaluated_at"))
+        for key in (
+            "metric_value",
+            "baseline",
+            "deviation",
+            "critical_val",
+            "major_val",
+            "minor_val",
+        ):
+            row[key] = _normalize_intish(row.get(key))
     return rows
 
 
@@ -345,7 +367,7 @@ def get_latest_metric_results(
             continue
         latest[metric_name.upper()] = {
             "metric_name": metric_name,
-            "metric_value": row.get("metric_value"),
+            "metric_value": _normalize_intish(row.get("metric_value")),
             "severity": row.get("severity"),
             "state": str(row.get("state") or ""),
             "evaluated_at": _format_dt(row.get("evaluated_at")),

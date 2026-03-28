@@ -3,10 +3,6 @@ from __future__ import annotations
 from pathlib import Path
 import re
 
-from django.db.utils import OperationalError, ProgrammingError
-
-from apps.targets.models import PropertyFile
-
 
 _PROP_RE = re.compile(r"^([^=]+)=(.*)$")
 
@@ -40,19 +36,8 @@ def read_file_text(path: Path) -> str:
 
 
 def get_property_content(name: str, fallback_path: Path | None = None) -> str:
-    try:
-        row = PropertyFile.objects.filter(name=name).first()
-    except (OperationalError, ProgrammingError):
-        row = None
-    if row is not None:
-        return row.content or ""
-    fallback = read_file_text(fallback_path) if fallback_path else ""
-    if fallback:
-        try:
-            PropertyFile.objects.create(name=name, content=fallback)
-        except Exception:
-            pass
-    return fallback
+    _ = name
+    return read_file_text(fallback_path) if fallback_path else ""
 
 
 def get_property_map(name: str, fallback_path: Path | None = None) -> dict[str, str]:
@@ -82,22 +67,12 @@ def set_property_content(
     content: str,
     fallback_path: Path | None = None,
 ) -> None:
+    _ = name
     normalized = str(content or "")
-    try:
-        row = PropertyFile.objects.filter(name=name).first()
-        if row is None:
-            PropertyFile.objects.create(name=name, content=normalized)
-        else:
-            row.content = normalized
-            row.save(update_fields=["content", "updated_at"])
-    except (OperationalError, ProgrammingError):
-        pass
-    if fallback_path:
-        try:
-            fallback_path.parent.mkdir(parents=True, exist_ok=True)
-            fallback_path.write_text(normalized, encoding="utf-8")
-        except Exception:
-            pass
+    if not fallback_path:
+        raise ValueError("fallback_path is required for file-backed property writes")
+    fallback_path.parent.mkdir(parents=True, exist_ok=True)
+    fallback_path.write_text(normalized, encoding="utf-8")
 
 
 def set_property_map(

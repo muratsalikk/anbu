@@ -20,7 +20,7 @@
       <li><code>eva/evaluator.py</code>: target run pipeline and metric evaluation logic.</li>
       <li><code>eva/engine.py</code>: parsing helpers, condition expression evaluation, action execution.</li>
       <li><code>eva/db.py</code>: datasource connections, SQL execution, runtime row insertion.</li>
-      <li><code>eva/baseline.py</code>: baseline/deviation calculation from historical runtime rows.</li>
+      <li><code>eva/baseline.py</code>: historical context calculation from runtime rows.</li>
     </ul>
   </div>
 </div>
@@ -133,15 +133,18 @@
   <div class="card-body">
     <h2 class="h5">7) Baseline and Deviation</h2>
     <p class="mb-2">
-      For each metric evaluation, baseline stats are calculated from historical runtime rows:
+      If the active metric references historical parameters, runtime calculates them from historical result rows:
     </p>
     <ul class="mb-0">
-      <li>Lookback window: last 3 months (config inside baseline function defaults).</li>
-      <li>Only same metric and same ISO weekday are considered.</li>
-      <li>Nearest minute-of-day samples are selected (up to max distance).</li>
+      <li>Historical parameters are fetched only when the active metric formulas/messages reference them.</li>
+      <li>Lookback window for baseline samples: last 3 months (config inside baseline function defaults).</li>
+      <li>Baseline samples use same metric, same ISO weekday, and nearest minute-of-day within max distance.</li>
       <li><code>BASELINE</code> is recency-weighted average (last month=3, prior month=2, third month=1).</li>
       <li><code>DEVIATION</code> is recency-weighted average absolute deviation using the same weights.</li>
-      <li>If baseline/deviation is required by formulas but unavailable, state can become <code>data_error</code>.</li>
+      <li><code>PREVIOUS</code> is the latest prior runtime value.</li>
+      <li><code>LAST_WEEK</code> is the nearest value from the UTC date one week earlier.</li>
+      <li><code>LAST_MONTH</code> is the nearest value from the UTC date one month earlier.</li>
+      <li>If a referenced historical value is required by a formula but unavailable, state can become <code>data_error</code>.</li>
     </ul>
   </div>
 </div>

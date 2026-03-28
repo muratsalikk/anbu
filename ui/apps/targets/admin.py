@@ -2,21 +2,11 @@ from django.contrib import admin
 from django.forms import Textarea
 from django.db import models
 
-from .models import PropertyFile, SavedQuery, TargetAudit
+from .models import SavedQuery, TargetAudit
 
 admin.site.site_header = "ANBU Alarm Management"
 admin.site.site_title = "ANBU Admin"
 admin.site.index_title = "User Management"
-
-
-@admin.register(PropertyFile)
-class PropertyFileAdmin(admin.ModelAdmin):
-    list_display = ("name", "updated_at", "created_at")
-    readonly_fields = ("updated_at", "created_at")
-    ordering = ("name",)
-    formfield_overrides = {
-        models.TextField: {"widget": Textarea(attrs={"rows": 30, "cols": 140})}
-    }
 
 
 @admin.register(TargetAudit)

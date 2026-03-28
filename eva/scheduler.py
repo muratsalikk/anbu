@@ -1,12 +1,11 @@
 from __future__ import annotations
 
-import json
 import os
 import threading
 import time
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
-from datetime import datetime, timedelta, time as dt_time
+from datetime import datetime, timedelta
 from pathlib import Path
 from queue import Empty, Queue
 from typing import Dict, List
@@ -14,9 +13,13 @@ from typing import Dict, List
 from croniter import croniter  # type: ignore
 
 from engine import (
+    BETWEEN_DAY_VALUES,
+    BetweenRule,
+    is_within_between_rules,
     load_engine_props,
     log_line,
     parse_bool,
+    parse_between_rules_json,
     parse_datetime,
     parse_env_file,
     parse_hhmm,
@@ -33,17 +36,6 @@ from db import (
     verify_result_pg_access,
 )
 from evaluator import run_target
-
-
-_BETWEEN_DAY_VALUES = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"]
-
-
-@dataclass
-class BetweenRule:
-    start: dt_time
-    end: dt_time
-    days: set[str]
-
 
 @dataclass
 class RuleHeader:
@@ -165,7 +157,7 @@ def load_rule_headers(rules_dir: Path) -> List[RuleHeader]:
             is_muted = parse_bool(env.get("IS_MUTED", "false"))
             mute_between_enabled = parse_bool(env.get("MUTE_BETWEEN_ENABLED", "false"))
             mute_until_enabled = parse_bool(env.get("MUTE_UNTIL_ENABLED", "false"))
-            mute_between_rules = _parse_between_rules_json(
+            mute_between_rules = parse_between_rules_json(
                 env.get("MUTE_BETWEEN_RULES", "")
             )
             if not mute_between_rules:
@@ -177,7 +169,7 @@ def load_rule_headers(rules_dir: Path) -> List[RuleHeader]:
                         BetweenRule(
                             start=legacy_start,
                             end=legacy_end,
-                            days=set(_BETWEEN_DAY_VALUES),
+                            days=set(BETWEEN_DAY_VALUES),
                         )
                     ]
             mute_until = parse_datetime(env.get("MUTE_UNTIL", ""))
@@ -219,72 +211,11 @@ def should_run_now(rule: RuleHeader, evaluated_at_local: datetime) -> bool:
 def compute_mute(rule: RuleHeader, next_minute_local: datetime) -> bool:
     muted = False
     if rule.mute_between_enabled and rule.mute_between_rules:
-        t = next_minute_local.time()
-        weekday = _BETWEEN_DAY_VALUES[next_minute_local.weekday()]
-        for between_rule in rule.mute_between_rules:
-            if between_rule.days and weekday not in between_rule.days:
-                continue
-            start = between_rule.start
-            end = between_rule.end
-            if start == end:
-                muted = True
-            elif start < end:
-                if start <= t < end:
-                    muted = True
-            else:
-                if t >= start or t < end:
-                    muted = True
-            if muted:
-                break
+        muted = is_within_between_rules(next_minute_local, rule.mute_between_rules)
     if rule.mute_until_enabled and rule.mute_until:
         if next_minute_local <= rule.mute_until:
             muted = True
     return muted
-
-
-def _normalize_between_days(value: object) -> set[str]:
-    if isinstance(value, str):
-        raw_items = [part.strip().upper() for part in value.split(",")]
-    elif isinstance(value, list):
-        raw_items = [str(item).strip().upper() for item in value]
-    else:
-        raw_items = []
-    days: set[str] = set()
-    for item in raw_items:
-        if item in _BETWEEN_DAY_VALUES:
-            days.add(item)
-    if not days:
-        days = set(_BETWEEN_DAY_VALUES)
-    return days
-
-
-def _parse_between_rules_json(value: str) -> List[BetweenRule]:
-    raw = (value or "").strip()
-    if not raw:
-        return []
-    try:
-        parsed = json.loads(raw)
-    except json.JSONDecodeError:
-        return []
-    if not isinstance(parsed, list):
-        return []
-    rules: List[BetweenRule] = []
-    for item in parsed:
-        if not isinstance(item, dict):
-            continue
-        start_hm = parse_hhmm(str(item.get("start", "")).strip())
-        end_hm = parse_hhmm(str(item.get("end", "")).strip())
-        if not start_hm or not end_hm:
-            continue
-        days = _normalize_between_days(item.get("days", []))
-        rules.append(
-            BetweenRule(
-                start=start_hm,
-                end=end_hm,
-                days=days,
-            )
-        )
-    return rules
 
 
 def sleep_until_next_minute() -> None:

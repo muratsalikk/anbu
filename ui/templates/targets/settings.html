@@ -11,31 +11,44 @@
 <form method="post" class="card mb-3">
   <div class="card-body">
     {% csrf_token %}
-    <h2 class="h6 mb-3">Application Properties</h2>
+    <h2 class="h6 mb-1">Application .env</h2>
+    <div class="text-muted small mb-3">{{ config_path }}</div>
     <div class="row g-3">
       <div class="col-12 col-md-6">
         <label class="form-label" for="{{ form.RULES_DIR.id_for_label }}">RULES_DIR</label>
         {{ form.RULES_DIR }}
       </div>
       <div class="col-12 col-md-6">
-        <label class="form-label" for="{{ form.DS_HOST.id_for_label }}">DS_HOST</label>
-        {{ form.DS_HOST }}
+        <label class="form-label" for="{{ form.DATASOURCE_DEFINITION_FILE.id_for_label }}">DATASOURCE_DEFINITION_FILE</label>
+        {{ form.DATASOURCE_DEFINITION_FILE }}
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label" for="{{ form.ACTION_DEFINITION_FILE.id_for_label }}">ACTION_DEFINITION_FILE</label>
+        {{ form.ACTION_DEFINITION_FILE }}
+      </div>
+      <div class="col-12 col-md-6">
+        <label class="form-label" for="{{ form.PG_HOST.id_for_label }}">PG_HOST</label>
+        {{ form.PG_HOST }}
       </div>
       <div class="col-12 col-md-3">
-        <label class="form-label" for="{{ form.DS_PORT.id_for_label }}">DS_PORT</label>
-        {{ form.DS_PORT }}
+        <label class="form-label" for="{{ form.PG_PORT.id_for_label }}">PG_PORT</label>
+        {{ form.PG_PORT }}
       </div>
       <div class="col-12 col-md-3">
-        <label class="form-label" for="{{ form.DS_DBNAME.id_for_label }}">DS_DBNAME</label>
-        {{ form.DS_DBNAME }}
+        <label class="form-label" for="{{ form.PG_DBNAME.id_for_label }}">PG_DBNAME</label>
+        {{ form.PG_DBNAME }}
       </div>
       <div class="col-12 col-md-3">
-        <label class="form-label" for="{{ form.DS_USER.id_for_label }}">DS_USER</label>
-        {{ form.DS_USER }}
+        <label class="form-label" for="{{ form.PG_USER.id_for_label }}">PG_USER</label>
+        {{ form.PG_USER }}
       </div>
       <div class="col-12 col-md-3">
-        <label class="form-label" for="{{ form.DS_PASS.id_for_label }}">DS_PASS</label>
-        {{ form.DS_PASS }}
+        <label class="form-label" for="{{ form.PG_PASS.id_for_label }}">PG_PASS</label>
+        {{ form.PG_PASS }}
+      </div>
+      <div class="col-12">
+        <label class="form-label" for="{{ form.PG_DSN.id_for_label }}">PG_DSN</label>
+        {{ form.PG_DSN }}
       </div>
       <div class="col-12 col-md-6">
         <label class="form-label" for="{{ form.HELPER_TEXT_FILE.id_for_label }}">HELPER_TEXT_FILE</label>
@@ -67,7 +80,7 @@
       </div>
     </div>
     <div class="mt-3">
-      <button type="submit" class="btn btn-primary">Save Application Properties</button>
+      <button type="submit" class="btn btn-primary">Save .env</button>
     </div>
   </div>
 </form>
